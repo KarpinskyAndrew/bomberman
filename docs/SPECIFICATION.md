@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Version** | 0.6 (draft) |
-| **Date** | 2026-11-01 |
+| **Version** | 0.7 (draft) |
+| **Date** | 2026-11-03 |
 | **Stack** | Go (backend / game server), Vue 3 (frontend), **PostgreSQL** (database), Google Cloud Platform (hosting) |
 
 Related documents:
@@ -13,11 +13,13 @@ Related documents:
 - [Events & Messaging](./EVENTS-AND-MESSAGING.md): event handling (in-game, notifications, domain events), the message queue decision, and the ELO pipeline.
 - [CI/CD on GCP](./CI-CD.md): Cloud Build, Artifact Registry, Cloud Deploy, Terraform pipelines.
 - [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, database access (pgx + sqlc, no ORM), a worked example and learning resources.
+- [Database Design](./DATABASE.md): the PostgreSQL schema (tables, constraints, FKs, indexes), its Go mapping, roles and migration plan.
 
 ### Changelog
 
 | Version | Changes |
 |---|---|
+| 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
 | 0.6 | **Go confirmed** for the backend after reviewing the alternatives (§6.2). The game rules stay in Go. The client re-implements only what it predicts (own movement and bomb placement), and **shared test vectors generated from the Go simulation** keep the two in sync. The networking code we write ourselves is listed and sized in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy). |
 | 0.5 | Confirmed 3 HP, 2–4 players and tile-by-tile movement. At the time-out, **the player with less HP loses** (§4.8.2). **EU-only regions** with EU data residency (§8.1). Added the **CI/CD on GCP** design ([CI-CD.md](./CI-CD.md)). |
 | 0.4 | A **match is now best-of-3 rounds** (§4.8). ELO is applied once per match, from the match placement. There are two game modes, **Ranked** and **Unrated** ("casual" renamed). Permanent rating with **no seasons in v1**. Data model gains `match_rounds`. |
@@ -549,130 +551,14 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 - **Migrations:** `golang-migrate`, run as a Cloud Run job before each deploy.
 - **Timeouts:** `statement_timeout = 5s` for API connections.
 
-```sql
-CREATE TABLE users (
-  id             UUID PRIMARY KEY,
-  username       CITEXT UNIQUE NOT NULL,
-  email          CITEXT UNIQUE NOT NULL,
-  password_hash  TEXT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_login_at  TIMESTAMPTZ
-);
+The full schema (every table, column, constraint, foreign key and index, plus the Go type mapping and migration plan) is in **[DATABASE.md](./DATABASE.md)**, which is the source of truth. Summary:
 
-CREATE TABLE refresh_tokens (
-  id          UUID PRIMARY KEY,
-  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash  TEXT NOT NULL,
-  expires_at  TIMESTAMPTZ NOT NULL,
-  revoked_at  TIMESTAMPTZ
-);
-CREATE INDEX ON refresh_tokens (user_id);
-
-CREATE TABLE player_ratings (
-  user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  rating         INT  NOT NULL DEFAULT 1200 CHECK (rating >= 100),
-  peak_rating    INT  NOT NULL DEFAULT 1200,
-  rated_matches  INT  NOT NULL DEFAULT 0,
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
--- leaderboard: only players past placement
-CREATE INDEX player_ratings_leaderboard
-  ON player_ratings (rating DESC, user_id) WHERE rated_matches >= 10;
-
-CREATE TABLE matches (
-  id            UUID PRIMARY KEY,           -- = matchId from the game server
-  arena_name    TEXT,
-  region        TEXT NOT NULL,
-  ruleset       TEXT NOT NULL,              -- 'standard' | 'custom'
-  mode          TEXT NOT NULL CHECK (mode IN ('ranked','unrated')),
-  best_of       SMALLINT NOT NULL CHECK (best_of IN (1,3,5)),
-  rounds_played SMALLINT NOT NULL,
-  rated         BOOLEAN NOT NULL,           -- rating actually applied (§5.4.2)
-  started_at    TIMESTAMPTZ NOT NULL,
-  ended_at      TIMESTAMPTZ NOT NULL,
-  duration_ms   INT NOT NULL,
-  result        TEXT NOT NULL CHECK (result IN ('win','draw'))
-);
-CREATE INDEX ON matches (ended_at DESC);
-
-CREATE TABLE match_rounds (                 -- one row per round of the best-of-N
-  match_id      UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  round_no      SMALLINT NOT NULL,          -- 1..best_of
-  seed          BIGINT NOT NULL,
-  started_at    TIMESTAMPTZ NOT NULL,
-  duration_ms   INT NOT NULL,
-  result        TEXT NOT NULL CHECK (result IN ('win','draw')),
-  winner_slot   SMALLINT NULL,
-  end_reason    TEXT NOT NULL CHECK (end_reason IN ('last_standing','timeout_hp','simultaneous')),
-  players       JSONB NOT NULL,             -- [{slot, placement, points, eliminatedTick, deathCause, killerSlot, alienType, kills, ...}]
-  input_log_uri TEXT,                       -- optional GCS replay of this round
-  PRIMARY KEY (match_id, round_no)
-);
-
-CREATE TABLE match_players (
-  match_id         UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  slot             SMALLINT NOT NULL,
-  user_id          UUID NULL REFERENCES users(id) ON DELETE SET NULL,  -- NULL = guest
-  display_name     TEXT NOT NULL,
-  placement        SMALLINT NOT NULL,       -- MATCH placement (§4.8.3); 1 = best; ties share a value
-  round_wins       SMALLINT NOT NULL DEFAULT 0,
-  round_points     SMALLINT NOT NULL DEFAULT 0,
-  forfeited        BOOLEAN  NOT NULL DEFAULT false,
-  -- totals across all rounds of the match (per-round detail lives in match_rounds.players)
-  kills            SMALLINT NOT NULL DEFAULT 0,
-  alien_kills      SMALLINT NOT NULL DEFAULT 0,
-  walls_destroyed  SMALLINT NOT NULL DEFAULT 0,
-  powerups_taken   SMALLINT NOT NULL DEFAULT 0,
-  bombs_placed     SMALLINT NOT NULL DEFAULT 0,
-  rating_before    INT NULL,                -- NULL if unrated
-  rating_after     INT NULL,
-  PRIMARY KEY (match_id, slot)
-);
-CREATE INDEX ON match_players (user_id, match_id);
-
-CREATE TABLE rating_history (
-  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  match_id       UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  rating_before  INT NOT NULL,
-  rating_after   INT NOT NULL,
-  delta          INT NOT NULL,
-  k_factor       SMALLINT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, match_id)
-);
-CREATE INDEX ON rating_history (user_id, created_at DESC);
-
-CREATE TABLE user_stats (                   -- denormalized for fast profile reads
-  user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  matches_played INT NOT NULL DEFAULT 0,
-  wins           INT NOT NULL DEFAULT 0,     -- matches won
-  rounds_played  INT NOT NULL DEFAULT 0,
-  round_wins     INT NOT NULL DEFAULT 0,
-  forfeits       INT NOT NULL DEFAULT 0,
-  kills          INT NOT NULL DEFAULT 0,
-  alien_kills    INT NOT NULL DEFAULT 0,
-  deaths         INT NOT NULL DEFAULT 0,
-  deaths_by_alien INT NOT NULL DEFAULT 0
-);
-
--- Messaging support (see EVENTS-AND-MESSAGING.md)
-CREATE TABLE processed_events (             -- consumer inbox: idempotency
-  event_id      UUID PRIMARY KEY,
-  event_type    TEXT NOT NULL,
-  processed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE outbox (                       -- producer outbox (API service)
-  id            UUID PRIMARY KEY,
-  topic         TEXT NOT NULL,
-  event_type    TEXT NOT NULL,
-  payload       JSONB NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at  TIMESTAMPTZ NULL,
-  attempts      INT NOT NULL DEFAULT 0
-);
-CREATE INDEX outbox_unpublished ON outbox (created_at) WHERE published_at IS NULL;
-```
+| Group | Tables |
+|---|---|
+| Accounts | `users`, with 1:1 components `user_credentials`, `player_ratings`, `user_stats`; `refresh_tokens` (rotation families) |
+| Match aggregate | `matches` → `match_players` (per slot), `match_rounds` (per round), `match_round_players` (per round × slot) |
+| Rating | `rating_history` (one row per rated player per rated match) |
+| Messaging | `processed_events` (consumer inbox), `outbox` (API producer) |
 
 - **Leaderboard rank** = `1 + count(*) of eligible players with a higher rating`. This query uses the partial index. Pages of the top 100 are cached in memory for 30 s.
 - A self-kill is not counted as a kill.
