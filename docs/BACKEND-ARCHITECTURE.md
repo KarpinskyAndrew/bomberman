@@ -89,7 +89,7 @@ Use case: `POST /api/auth/register` creates a user **and** their `player_ratings
 
 ### 4.1 Migration (`internal/store/migrations/0001_users.up.sql`)
 
-The schema is in [SPECIFICATION §7](./SPECIFICATION.md#7-data-model-postgresql). `users` and `player_ratings` are shown there.
+The schema is in [DATABASE.md §3](./DATABASE.md#3-tables). Registration touches `users`, `user_credentials`, `player_ratings` and `user_stats`.
 
 ### 4.2 Queries (`internal/store/queries/users.sql`)
 
@@ -201,7 +201,11 @@ func (s *Service) Register(ctx context.Context, username, email, password string
     if err != nil {
         return User{}, fmt.Errorf("hash password: %w", err)
     }
-    return s.repo.CreateWithRating(ctx, User{ID: uuid.New(), Username: name, Email: email}, hash)
+    id, err := uuid.NewV7() // time-ordered IDs, see DATABASE.md §1.2
+    if err != nil {
+        return User{}, fmt.Errorf("new id: %w", err)
+    }
+    return s.repo.CreateWithRating(ctx, User{ID: id, Username: name, Email: email}, hash)
 }
 ```
 

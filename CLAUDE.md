@@ -12,17 +12,19 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4
 | `docs/SERVER-AND-NETWORK.md` | Go monorepo layout, simulation package, arena actor, binary protocol, prediction/interpolation |
 | `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker |
 | `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), pgx + sqlc (no ORM), worked example |
+| `docs/DATABASE.md` | **Schema source of truth**: every table, constraint, FK and index, Go type mapping, roles, migration plan |
 | `docs/GUI-PLAN.md` | Vue app structure, stores, canvas renderer, client event handling |
 | `docs/CI-CD.md` | Cloud Build pipelines, Cloud Deploy, Terraform, migration policy, branching model, public-repo safeguards |
 
 ## Git workflow (mandatory)
 
-- **Allowed:** create `feature/<topic>` or `bugfix/<topic>` branches from `dev`, commit to them, push them, and open pull requests with `gh pr create --base dev`.
-- **Never** merge, approve, close or otherwise complete a pull request (no `gh pr merge`, no `gh pr review --approve`, no `gh pr close`). The repo owner reviews every diff and finishes PRs themselves.
+- **Allowed:** create `feature/<topic>` or `bugfix/<topic>` branches from `dev`, commit to them, push them, merge branches locally (e.g. `dev` into a feature branch, or one feature branch into another), and open pull requests with `gh pr create --base dev`.
+- **HARD RULE: never complete a pull request.** Completing PRs is done manually by the repo owner. That means no merging, approving, closing or auto-merging a PR by any means: no `gh pr merge` (including `--auto`), no `gh pr review --approve`, no `gh pr close`, no GitHub API calls that do the same. The owner reviews every diff and finishes PRs themselves.
 - **Never** commit or push directly to `dev` or `main`, and never force-push them.
-- Merge policy, which the owner carries out:
-  - feature/bug PRs → `dev` are **squash merged**, so keep the branch rebased on `dev`.
-  - `dev` → `main` is **fast-forward only**.
+- **Commit authorship:** every commit must be authored and committed as `KarpinskyAndrew <kbandee87@gmail.com>`, never as Claude. Don't add `Co-Authored-By: Claude` trailers or "Generated with Claude Code" lines to commit messages or PR descriptions. Check `git config user.name` / `user.email` before committing, or pass `--author="KarpinskyAndrew <kbandee87@gmail.com>"`.
+- **Merge policy** (the owner carries out the PR merges):
+  - **All `feature/*` and `bugfix/*` branches go to `dev` with squash-and-rebase.** Before opening or updating a PR, rebase the branch onto the latest `dev` (`git fetch && git rebase origin/dev`) and fix any conflicts. Then the PR lands on `dev` as one squashed commit on top of `dev`, so `dev` history stays linear with no merge commits. Never target `main` from a feature or bug branch.
+  - **`dev` → `main` is fast-forward only.** `main` must always be an ancestor of `dev`, so there are never merge commits or extra commits on `main`.
 - The repository is **public**. Never commit secrets, `.env` files, keys or sensitive `*.tfvars`.
 
 The build order follows the milestones in `SPECIFICATION.md` §12, starting with M1, the core simulation in `server/internal/game`.

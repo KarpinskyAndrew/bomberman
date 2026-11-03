@@ -294,15 +294,16 @@ Pub/Sub's *exactly-once delivery* feature applies to pull subscriptions only, an
 BEGIN;  -- READ COMMITTED is sufficient: rating rows are locked explicitly
 
 -- 1. Inbox / idempotency
-INSERT INTO processed_events (event_id, event_type)
-VALUES ($ce_id, 'match.finished.v1')
+INSERT INTO processed_events (consumer, event_id, event_type)
+VALUES ('rating-worker', $ce_id, 'match.finished.v1')
 ON CONFLICT DO NOTHING;
 -- 0 rows inserted → duplicate delivery → COMMIT and ack (HTTP 204). Done.
 
 -- 2. Persist the match (only if ≥ 1 registered player; guest-only matches go to BigQuery only)
 INSERT INTO matches (...) VALUES (...);
+INSERT INTO match_players (...) VALUES (...), (...);           -- before rounds: rounds FK the winner slot
 INSERT INTO match_rounds (...) VALUES (...), (...), (...);   -- one row per round played
-INSERT INTO match_players (...) VALUES (...), (...);
+INSERT INTO match_round_players (...) VALUES (...), ...;      -- one row per round × slot (DATABASE.md §3.9)
 INSERT INTO user_stats (...) VALUES (...)
   ON CONFLICT (user_id) DO UPDATE SET matches_played = user_stats.matches_played + 1, ...;
 
