@@ -52,6 +52,7 @@ Go has no inheritance, and the schema doesn't use any either. In practice:
 | Numbers | Integers only (matching the integer-only simulation). `SMALLINT` for small bounded values (slots, placements, per-match counters), `INT` for ratings and lifetime counters, `BIGINT` for seeds. No `REAL`, `DOUBLE PRECISION` or `NUMERIC`. |
 | Time | `TIMESTAMPTZ` only, stored in UTC. Durations are `INT` milliseconds (`*_ms`). Game time is `INT` ticks (`*_tick`). |
 | Foreign keys | Every FK has an explicit `ON DELETE` policy. Every FK column (or column group) is the leading part of an index, unless §5 lists it as an exception. PostgreSQL doesn't create these indexes automatically. |
+| CHECKs on nullable columns | A CHECK that evaluates to NULL **passes**, so a condition on a nullable column can quietly let bad rows through. Write the null case out explicitly: `(a IS NULL) = (b IS NULL)` for "both or neither", and `col IS NOT DISTINCT FROM 'x'` instead of `col = 'x'`. Every such CHECK gets a test with the NULL case (§8). |
 | JSON | Used only for opaque payloads (`outbox.payload`). Anything that is queried, joined or constrained gets real columns. |
 | Defaults | DB defaults only for `now()` timestamps and zero counters. Business values (rating 1200, etc.) also come from Go, so they live in one place. The DB defaults match them as a safety net. |
 
@@ -405,9 +406,10 @@ CREATE TABLE match_players (
     placement BETWEEN 1 AND 4 AND round_wins BETWEEN 0 AND 3 AND round_points BETWEEN 0 AND 15),
   CONSTRAINT match_players_counters_check    CHECK (
     kills >= 0 AND alien_kills >= 0 AND walls_destroyed >= 0 AND powerups_taken >= 0 AND bombs_placed >= 0),
+  -- both-or-neither written with IS NULL on both sides, so the check can never evaluate to NULL (see §3.9 "NULL trap")
   CONSTRAINT match_players_rating_check      CHECK (
-    (rating_before IS NULL AND rating_after IS NULL)
-    OR (rating_before >= 100 AND rating_after >= 100))
+    (rating_before IS NULL) = (rating_after IS NULL)
+    AND (rating_before IS NULL OR (rating_before >= 100 AND rating_after >= 100)))
 );
 -- Match history of a user, newest first: match_id is UUIDv7 (time-ordered), so no join is needed to sort
 CREATE INDEX match_players_user_id_idx ON match_players (user_id, match_id DESC) WHERE user_id IS NOT NULL;
@@ -885,6 +887,8 @@ These are the initial migrations, in `server/internal/store/migrations/`. Each f
 | `0004_matches.up.sql` | `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history` |
 | `0005_messaging.up.sql` | `processed_events`, `outbox` |
 | `0006_roles.up.sql` | Grants (§7). Role creation itself is in Terraform, because IAM DB users are Cloud SQL resources. |
+
+**Constraint tests:** the integration suite (`-tags=integration`) applies the migrations and then, for every named constraint, inserts one row that violates **only** that constraint and asserts the error's `ConstraintName`. CHECKs on nullable columns also get a NULL-case row. It also covers the cascades (account deletion, match deletion) and uses `EXPLAIN` to check that each query in §5 uses its index. This DDL was checked this way against `postgres:17` when this document was written (44 rejection cases, 2 cascade scenarios, 5 plans).
 
 **Rules for later changes** (expand → migrate → contract):
 
