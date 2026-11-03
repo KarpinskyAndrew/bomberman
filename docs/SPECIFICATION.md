@@ -12,6 +12,7 @@ Related documents:
 - [Server & Network Design](./SERVER-AND-NETWORK.md): game server internals, binary protocol, latency minimization, deployment topology.
 - [Events & Messaging](./EVENTS-AND-MESSAGING.md): event handling (in-game, notifications, domain events), the message queue decision, and the ELO pipeline.
 - [CI/CD on GCP](./CI-CD.md): Cloud Build, Artifact Registry, Cloud Deploy, Terraform pipelines.
+- [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, database access (pgx + sqlc, no ORM), a worked example and learning resources.
 
 ### Changelog
 
@@ -811,4 +812,4 @@ Defaults are proposed above. Please confirm or change them:
 
 **Still open:**
 
-1. **Git hosting** for CI/CD triggers: GitHub (assumed), GitLab or Bitbucket? See [CI/CD §9](./CI-CD.md#9-open-questions).
+1. **License** for the public source. See [CI/CD §9](./CI-CD.md#9-open-questions). *(Git hosting is resolved: a public GitHub repository.)*

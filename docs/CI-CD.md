@@ -2,20 +2,27 @@
 
 | | |
 |---|---|
-| **Version** | 0.1 (draft) |
-| **Date** | 2026-10-27 |
+| **Version** | 0.2 (draft) |
+| **Date** | 2026-11-01 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) |
 
-**Short answer:** yes, the whole pipeline can run on GCP using **Cloud Build** (CI, triggers), **Artifact Registry** (images), **Cloud Deploy** (staging → prod promotion, approvals, canary, rollback) and **Terraform** run from Cloud Build (infrastructure). The only part outside GCP is the Git hosting itself (see §9).
+**Changes in 0.2:**
+
+- Git hosting is settled. The source is a **public GitHub repository**: https://github.com/KarpinskyAndrew/bomberman.
+- New §3a describes the **branching and merge model**: feature/bug branches → `dev` (squash) → `main` (fast-forward only).
+- CI now runs on PRs to both `dev` and `main`. New §2a lists the safeguards a public repo needs: fork PRs, secrets, logs and Terraform plans.
+
+**Short answer:** yes, the whole pipeline can run on GCP using **Cloud Build** (CI, triggers), **Artifact Registry** (images), **Cloud Deploy** (staging → prod promotion, approvals, canary, rollback) and **Terraform** run from Cloud Build (infrastructure). The only part outside GCP is the Git hosting itself: GitHub.
 
 ---
 
 ## 1. Overview
 
 ```
- GitHub (private repo)
-   │  PR opened/updated ───────────────► Cloud Build: ci.yaml  (lint, test, build check) ──► status check on PR
-   │  merge to main ───────────────────► Cloud Build: release.yaml
+ GitHub (public repo)
+   │  PR → dev or main opened/updated ─► Cloud Build: ci.yaml  (lint, test, build check) ──► status check on PR
+   │                                     (fork PRs only after a maintainer comments /gcbrun)
+   │  fast-forward dev → main ─────────► Cloud Build: release.yaml
    │                                        ├─ test again, build images (api, gameserver, worker, migrate)
    │                                        ├─ push → Artifact Registry (europe-west3) + SLSA provenance + vuln scan
    │                                        ├─ build web bundle → GCS artifacts bucket
@@ -64,6 +71,24 @@ All projects are in EU locations. The org policy `gcp.resourceLocations = in:eu-
 
 ---
 
+## 2a. Public Repository Safeguards
+
+The source is public, so anyone can read it, fork it and open PRs. The pipeline is designed so that this never exposes credentials or infrastructure:
+
+| Risk | Safeguard |
+|---|---|
+| Untrusted code from fork PRs runs in CI | Cloud Build **comment control**: PRs from non-collaborators run only after a maintainer reviews the diff and comments `/gcbrun`. The CI service account (`cb-ci`) has no secrets, no registry push and no deploy rights anyway. |
+| Secrets committed by mistake | No secrets, `.env` files, service-account keys or `*.tfvars` with sensitive values are committed (enforced by `.gitignore`). GitHub **secret scanning** and **push protection** are turned on. Runtime secrets exist only in Secret Manager. |
+| Infrastructure details leaked through PR comments | `terraform plan` output is **not** posted to PR comments, because the PRs are public. It stays in the Cloud Build logs, which only project members can read, and the PR shows only a pass/fail summary. |
+| Build logs | Cloud Build logs stay in GCP (`CLOUD_LOGGING_ONLY`) and are not public. The GitHub status check only links to them. |
+| Vulnerable dependencies | **Dependabot** alerts and security updates (free for public repos), plus `govulncheck` and `npm audit` nightly (§4.5). |
+| Unreviewed changes reaching `dev` or `main` | Branch rulesets (§3a): changes arrive only through PRs, with the `ci` check and a maintainer review required. Force-pushes and deletions are blocked. |
+| Resource names in Terraform | Project IDs, bucket names and regions are not secret and may stay in the repo. Access is controlled by IAM, not by hiding names. |
+
+Open items for going public: pick a **license**, and add `SECURITY.md` (how to report vulnerabilities privately) and `CONTRIBUTING.md` (the branching rules from §3a). See §9.
+
+---
+
 ## 3. Repository Layout for CI/CD
 
 ```
@@ -86,15 +111,44 @@ All projects are in EU locations. The org policy `gcp.resourceLocations = in:eu-
 
 ---
 
+## 3a. Branching & Merge Model
+
+```
+feature/<topic>  ─┐
+bugfix/<topic>   ─┼─ PR, squash merge ─► dev ─── fast-forward only ───► main ──► release.yaml
+                 ─┘   (1 commit per PR)        (no merge commits)
+```
+
+| Branch | Purpose | How changes arrive |
+|---|---|---|
+| `feature/<topic>`, `bugfix/<topic>` | One change each, branched from `dev` | Direct commits by the author |
+| `dev` | Integration branch, always green | PRs only, **squash merged**, so each PR becomes one linear commit. Rebase the branch on `dev` first if it is behind. |
+| `main` | What gets released. Every commit is deployable. | **Fast-forward only** from `dev`, never a merge commit or squash. |
+
+- **Feature → dev:** use GitHub "Squash and merge". Only the repo owner merges PRs, after reviewing the diff.
+- **dev → main:** GitHub's PR merge buttons always create new commits, so the fast-forward is done with git:
+  ```bash
+  git fetch origin
+  git push origin origin/dev:main     # rejected by git if it is not a fast-forward
+  ```
+  `main` and `dev` then point at the same commit. A dev → main PR can still be opened for review and the CI check, then closed after the push.
+- **Repository settings:** allow only **squash merging** for PRs, and turn on "Automatically delete head branches".
+- **Rulesets:**
+  - `dev`: require a PR, the `ci` check and 1 approval.
+  - `main`: require linear history, block force-pushes and deletions, and allow only maintainers to push. That push is the fast-forward.
+- **Hotfixes:** create `bugfix/*` from `dev`, merge it, then fast-forward `main`. Nothing goes directly into `main`.
+
+---
+
 ## 4. Pipelines
 
 ### 4.1 CI: pull requests (`ci.yaml`)
 
 | Setting | Value |
 |---|---|
-| Trigger | Pull request to `main` |
+| Trigger | Pull request to `dev` or `main` (branch regex `^(dev|main)$`) |
 | Build config | `cloudbuild/ci.yaml` |
-| PRs from forks | Run only after a maintainer comments `/gcbrun` (comment control), so outside code never runs with project credentials |
+| PRs from forks | Run only after a maintainer comments `/gcbrun` (comment control, "required except for owners and collaborators"), so outside code never runs with project credentials. See §2a. |
 | Status | Reported back to GitHub as a **required status check** |
 
 | Step (runs in parallel where possible) | Tooling |
@@ -104,7 +158,7 @@ All projects are in EU locations. The org policy `gcp.resourceLocations = in:eu-
 | Go integration tests | `docker compose` with **Postgres 17 + Pub/Sub emulator** on the `cloudbuild` network, then `go test -tags=integration` (inbox idempotency, migrations up/down) |
 | Short fuzzing | `go test -fuzz=. -fuzztime=30s` on the protocol decoder |
 | Web | `npm ci`, `eslint`, `vue-tsc`, `vitest --run`, `vite build` |
-| Protocol contract | Go & TS golden-vector tests for the codec. **Rule vectors:** a Go test reruns `cmd/vectorgen` and fails if `/protocol/testdata/rules` is stale, then Vitest replays them through the TS prediction subset. `buf lint` + `buf breaking` against `main` for the event schemas. |
+| Protocol contract | Go & TS golden-vector tests for the codec. **Rule vectors:** a Go test reruns `cmd/vectorgen` and fails if `/protocol/testdata/rules` is stale, then Vitest replays them through the TS prediction subset. `buf lint` + `buf breaking` against the PR's base branch (`$_BASE_BRANCH`) for the event schemas. |
 | Container build check | `docker build` of all targets (no push) |
 
 **Target duration:** under 10 min on `E2_HIGHCPU_8`. Go modules and npm are cached in a GCS cache bucket.
@@ -142,7 +196,7 @@ steps:
     waitFor: ['-']
   - id: buf-breaking
     name: bufbuild/buf
-    args: ['breaking', 'protocol/events', '--against', '.git#branch=main,subdir=protocol/events']
+    args: ['breaking', 'protocol/events', '--against', '.git#branch=${_BASE_BRANCH},subdir=protocol/events']
     waitFor: ['-']
 options:
   machineType: E2_HIGHCPU_8
@@ -150,7 +204,9 @@ options:
 timeout: 1200s
 ```
 
-### 4.2 Release: merge to `main` (`release.yaml`)
+### 4.2 Release: push to `main` (`release.yaml`)
+
+The trigger fires on every push to `main`. With the §3a model, that only happens when `dev` is fast-forwarded into `main`, so every release is a commit that already passed CI on `dev`.
 
 1. Re-run the fast tests (unit, lint) as a safety net.
 2. Build the images `api`, `gameserver`, `worker` and `migrate`, tagged `$SHORT_SHA`, and push them to Artifact Registry. Cloud Build generates **SLSA build provenance**, and **Artifact Analysis** scans for vulnerabilities on push.
@@ -231,8 +287,8 @@ executionConfigs:
 
 | Event | Action |
 |---|---|
-| PR touching `infra/**` | `terraform fmt -check`, `validate`, `tflint`, `plan` for staging and prod. The plan output is posted as a build summary or PR comment. |
-| Merge to `main` | `apply` to **staging** automatically. **Prod** apply runs on a separate trigger with **Cloud Build approval required**. |
+| PR touching `infra/**` | `terraform fmt -check`, `validate`, `tflint`, `plan` for staging and prod. The plan output stays in the Cloud Build logs and is **never** posted to the public PR (§2a). Fork PRs need `/gcbrun`. |
+| Push to `main` (fast-forward from `dev`) | `apply` to **staging** automatically. **Prod** apply runs on a separate trigger with **Cloud Build approval required**. |
 | State | GCS bucket `bomberman-tfstate` (EU, versioning on, uniform access), one prefix per environment |
 
 GCP's managed Terraform service, **Infrastructure Manager**, is an alternative. Plain Terraform in Cloud Build is chosen here because it is more transparent and portable.
@@ -281,13 +337,14 @@ GCP's managed Terraform service, **Infrastructure Manager**, is an alternative. 
 
 ## 8. Bootstrap Steps (one-time)
 
-1. **Host the repository** on GitHub (private). Cloud Source Repositories is no longer available to new customers.
+1. **Host the repository** on GitHub (**public**: https://github.com/KarpinskyAndrew/bomberman). Cloud Source Repositories is no longer available to new customers. Create the `dev` branch from `main`, make `dev` the default branch so PRs target it, and turn on secret scanning, push protection and Dependabot (§2a).
 2. Create the projects `bomberman-cicd`, `-staging` and `-prod`, link billing, and set the org policy for EU locations.
 3. Run Terraform **locally once** for `envs/cicd`. This enables the APIs and creates Artifact Registry, the state and artifact buckets, the service accounts and the Cloud Deploy pipelines.
 4. **Connect GitHub** to Cloud Build using a 2nd-gen repository connection. This means installing the Cloud Build GitHub App, a one-time step in the console. Then create the triggers (also in Terraform).
-5. Push to `main`. The infra-apply trigger creates staging, and the first release deploys to staging.
+   Set comment control on the PR trigger so fork PRs need `/gcbrun`.
+5. Fast-forward `dev` into `main`. The infra-apply trigger creates staging, and the first release deploys to staging.
 6. Grant prod approvers `roles/clouddeploy.approver`, approve the prod infra apply, then promote the first release.
-7. In GitHub branch protection, require the `ci` status check and at least 1 review on `main`.
+7. Configure GitHub rulesets as described in §3a. Set PR merges to squash only.
 
 **Cost:**
 
@@ -302,7 +359,13 @@ GCP's managed Terraform service, **Infrastructure Manager**, is an alternative. 
 
 ## 9. Open Questions
 
-1. **Git hosting:** GitHub (assumed), GitLab or Bitbucket? All three work with Cloud Build triggers.
-2. **Prod approvers:** who may approve prod promotions and infra applies?
-3. **Notifications:** Slack channel, email, or both?
-4. **Game server deploy window (v1):** which time of day? For example 05:00–06:00 CET.
+**Resolved:**
+
+- **Git hosting:** a public GitHub repository (§2a), using the branching model in §3a.
+
+**Still open:**
+
+1. **Prod approvers:** who may approve prod promotions and infra applies?
+2. **Notifications:** Slack channel, email, or both?
+3. **Game server deploy window (v1):** which time of day? For example 05:00–06:00 CET.
+4. **License** for the public source: for example MIT, Apache-2.0 or AGPL-3.0.
