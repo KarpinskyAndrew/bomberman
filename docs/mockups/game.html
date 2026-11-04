@@ -14,9 +14,9 @@
 
 <div class="game">
   <header class="hud-top">
-    <span class="clock"><svg class="i"><use href="#i-clock"/></svg><span class="sd-normal">1:42</span><span class="sd-active">2:38</span></span>
+    <span class="clock"><svg class="i"><use href="#i-clock"/></svg><span class="sd-normal cd-hide">1:42</span><span class="cd-only">0:00</span><span class="sd-active">2:38</span></span>
     <span class="round-title">Friday Blast · <b>ROUND 2 / 3</b></span>
-    <span class="sd-chip"><svg class="i"><use href="#i-warn"/></svg> <span class="txt">SUDDEN DEATH</span> <span class="sd-normal num">in 0:22</span><span class="sd-active">NOW</span></span>
+    <span class="sd-chip"><svg class="i"><use href="#i-warn"/></svg> <span class="txt">SUDDEN DEATH</span> <span class="sd-normal num cd-hide">in 0:22</span><span class="num cd-only">in 2:00</span><span class="sd-active">NOW</span></span>
     <span class="ping num">24 ms</span>
     <a class="icon-btn" href="#esc" aria-label="Menu (Esc)"><svg class="i"><use href="#i-pause"/></svg></a>
   </header>
@@ -24,13 +24,18 @@
   <aside class="hud-side left" aria-label="Players">
     <div class="pcard me" style="--pc:var(--p1)">
       <div class="top"><span class="swatch"></span><b>Andrew</b><span class="you">YOU</span><span class="crown"><svg class="i"><use href="#i-crown"/></svg></span><span class="pips"><i class="on"></i><i></i></span></div>
-      <span class="hearts" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
-      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/2</span></div>
-      <span class="warn-eye"><svg class="i"><use href="#i-eye"/></svg> Seeker is hunting you</span>
+      <span class="hearts cd-hide dead-hide" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-hide dead-hide"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/2</span></div>
+      <span class="warn-eye cd-hide dead-hide"><svg class="i"><use href="#i-eye"/></svg> Seeker is hunting you</span>
+      <span class="hearts cd-only" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-only"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/1</span></div>
+      <span class="state dead-only"><svg class="i"><use href="#i-skull"/></svg> Eliminated</span>
     </div>
     <div class="pcard out" style="--pc:var(--p3)">
       <div class="top"><span class="swatch"></span><b>Kate</b><span class="pips"><i></i><i></i></span></div>
-      <span class="state"><svg class="i"><use href="#i-skull"/></svg> Eliminated</span>
+      <span class="state cd-hide"><svg class="i"><use href="#i-skull"/></svg> Eliminated</span>
+      <span class="hearts cd-only" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-only"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/1</span></div>
     </div>
     <div class="aliens-box">
       <b style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)">Aliens · 3 / 4</b>
@@ -96,8 +101,10 @@
   <aside class="hud-side right" aria-label="Opponents">
     <div class="pcard" style="--pc:var(--p2)">
       <div class="top"><span class="swatch"></span><b>Guest-4821</b><span class="pips"><i class="on"></i><i></i></span></div>
-      <span class="hearts" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
-      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/1</span></div>
+      <span class="hearts cd-hide" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-hide"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/1</span></div>
+      <span class="hearts cd-only" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-only"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/1</span></div>
     </div>
     <div class="pcard empty" style="--pc:#2b3247">
       <div class="top"><span class="swatch"></span><b>Empty slot</b></div>
@@ -107,9 +114,11 @@
 
   <footer class="killfeed" aria-live="polite">
     <span class="lbl">Feed</span>
-    <span class="ev"><b style="color:var(--p1)">Andrew</b> <svg class="i" style="color:var(--fire-2)"><use href="#i-bomb"/></svg> Seeker <span class="dim">(+bomb)</span></span>
-    <span class="ev"><b style="color:var(--p3)">Kate</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
-    <span class="ev"><b style="color:var(--p2)">Guest-4821</b> picked up <svg class="i" style="color:var(--fire-2)"><use href="#i-fire"/></svg></span>
+    <span class="ev dead-only"><b style="color:var(--p1)">Andrew</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
+    <span class="ev cd-only">Round 2 is starting · all players at spawn</span>
+    <span class="ev cd-hide"><b style="color:var(--p1)">Andrew</b> <svg class="i" style="color:var(--fire-2)"><use href="#i-bomb"/></svg> Seeker <span class="dim">(+bomb)</span></span>
+    <span class="ev cd-hide"><b style="color:var(--p3)">Kate</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
+    <span class="ev cd-hide"><b style="color:var(--p2)">Guest-4821</b> picked up <svg class="i" style="color:var(--fire-2)"><use href="#i-fire"/></svg></span>
   </footer>
 </div>
 
@@ -166,7 +175,8 @@
         players: [{ x: 1, y: 1, color: C.p1, name: 'Andrew' }, { x: 19, y: 1, color: C.p2, name: 'Guest-4821' }, { x: 1, y: 19, color: C.p3, name: 'Kate' }] };
     }
     if (h === 'sudden') base.falling = [[1, 1], [2, 1], [3, 1], [1, 2], [1, 3]];
-    if (h === 'eaten' || h === 'spectating') {
+    // Andrew was eaten by the Brute: eaten -> spectating -> round end (Guest-4821 is the last one alive).
+    if (h === 'eaten' || h === 'spectating' || h === 'round-end') {
       base.players[0].dead = true;
       base.aliens[2] = { type: 'brute', x: 5, y: 3, hp: 2 };
       base.aliens[0] = { type: 'seeker', x: 7, y: 5, locked: true, target: [15, 9] };

@@ -32,8 +32,9 @@
   --t-diamond: #8fb8ff;
 
   --radius: 14px;
-  --font-display: "Bungee", Inter, system-ui, sans-serif;
-  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Web fonts come from Google Fonts; the fallbacks keep pages readable if they fail to load. */
+  --font-display: "Bungee", "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
+  --font-ui: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color-scheme: dark;
 }
 
@@ -463,7 +464,7 @@ body.game-body { height: 100vh; overflow: hidden; }
 .pcard .stats span { display: inline-flex; align-items: center; gap: 5px; }
 .pcard .stats .fire { color: var(--fire-2); }
 .pcard.out { opacity: 0.5; filter: grayscale(0.9); }
-.pcard.out .state { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.pcard .state { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
 .pcard.empty { border-style: dashed; background: transparent; color: var(--dim); font-size: 13px; }
 .pcard.empty::before { background: #2b3247; }
 .pcard .warn-eye { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--bad); animation: blink 0.8s steps(2) infinite; }
@@ -476,7 +477,20 @@ body.game-body { height: 100vh; overflow: hidden; }
 .killfeed .ev { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .killfeed .ev b { color: var(--ink); }
 .killfeed .ev .i { width: 14px; height: 14px; }
-.killfeed .ev:not(:first-of-type) { opacity: 0.6; }
+.killfeed .ev { opacity: 0.6; }
+/* The newest event is full strength. The state-only events sit right after the label, hidden unless their state is active. */
+body:not(:has(#eaten:target, #spectating:target, #round-end:target)) .killfeed .lbl + .dead-only + .cd-only + .ev,
+.killfeed .ev.dead-only, .killfeed .ev.cd-only { opacity: 1; }
+
+/* HUD content that depends on the state.
+   Countdown: everyone is alive at spawn with starting stats.
+   Eaten / spectating / round end: the local player (Andrew) is eliminated. */
+body:not(:has(#countdown:target)) .cd-only,
+body:has(#countdown:target) .cd-hide,
+body:not(:has(#eaten:target, #spectating:target, #round-end:target)) .dead-only,
+body:has(#eaten:target, #spectating:target, #round-end:target) .dead-hide { display: none; }
+body:has(#countdown:target) .pcard.out { opacity: 1; filter: none; }
+body:has(#eaten:target, #spectating:target, #round-end:target) .pcard.me { opacity: 0.5; filter: grayscale(0.9); box-shadow: none; }
 
 /* Overlays inside the stage */
 .overlay { position: absolute; inset: 0; z-index: 5; display: none; place-items: center; padding: 16px; }
