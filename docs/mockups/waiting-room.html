@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waiting room · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body data-states="private|Private arena (invite code);not-host|As a non-host player">
+<i id="private" class="anchor"></i><i id="not-host" class="anchor"></i>
+
+<header class="topbar room-bar">
+  <a class="btn btn-ghost btn-sm" href="lobby.html"><svg class="i"><use href="#i-arrow-left"/></svg> Leave</a>
+  <div class="title">
+    <b class="only-public">Friday Blast</b>
+    <b class="only-private">Kate's birthday</b>
+    <span class="badge badge-ranked only-public"><svg class="i"><use href="#i-star"/></svg> Ranked</span>
+    <span class="badge badge-unrated only-private"><svg class="i"><use href="#i-lock"/></svg> Private</span>
+  </div>
+  <div class="spacer"></div>
+  <span class="code-pill only-private"><span class="lbl">Code</span> <b>K7M2QX</b>
+    <a class="icon-btn" href="#private" aria-label="Copy code" style="width:30px;height:30px"><svg class="i"><use href="#i-copy"/></svg></a>
+    <a class="icon-btn" href="#private" aria-label="Copy invite link" style="width:30px;height:30px"><svg class="i"><use href="#i-link"/></svg></a>
+  </span>
+  <a class="btn btn-sm only-public" href="#"><svg class="i"><use href="#i-link"/></svg> <span class="lbl">Copy link</span></a>
+  <span class="ping num"><span class="txt">EU ·</span> 24 ms</span>
+</header>
+
+<main class="page">
+  <div class="room">
+    <div class="stack">
+      <section class="slot-grid" aria-label="Players">
+        <div class="slot me" style="--pc:var(--p1)">
+          <span class="avatar">A</span>
+          <span class="nm">Andrew</span>
+          <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span><span class="tier tier-gold num" style="font-size:13px">1342</span></span>
+          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
+        <div class="slot" style="--pc:var(--p2)">
+          <span class="avatar">G</span>
+          <span class="nm">Guest-4821</span>
+          <span class="tags"><span class="badge badge-guest">Guest</span></span>
+          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
+        <div class="slot" style="--pc:var(--p3)">
+          <span class="avatar">K</span>
+          <span class="nm">Kate</span>
+          <span class="tags"><span class="tier tier-silver num" style="font-size:13px">1290</span></span>
+          <span class="state not"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+        <div class="slot empty" style="--pc:var(--p4)">
+          <span class="avatar"><svg class="i"><use href="#i-plus"/></svg></span>
+          <span class="nm dim">Open slot</span>
+          <span class="tags"></span>
+          <span class="state not">Waiting<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
+        </div>
+      </section>
+
+      <section class="panel panel-pad stack">
+        <div class="rules only-public">
+          <span class="chip hot"><svg class="i"><use href="#i-star"/></svg> Ranked</span>
+          <span class="chip">Best of 3</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
+        </div>
+        <div class="rules only-private">
+          <span class="chip">Unrated</span>
+          <span class="chip">Best of 5</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 6</span>
+        </div>
+        <p class="hint only-public">Standard rules. Registered players are rated after the match; guests play unrated.</p>
+        <p class="hint only-private">Private arenas are never rated. Share the code or the link to invite friends.</p>
+        <div class="room-actions">
+          <a class="btn btn-lg btn-ok" href="#"><svg class="i"><use href="#i-check"/></svg> Ready</a>
+          <a class="btn btn-lg btn-primary host-only" href="game.html#countdown"><svg class="i"><use href="#i-play"/></svg> Start match</a>
+          <span class="nonhost-only muted" style="align-items:center;gap:8px"><svg class="i"><use href="#i-clock"/></svg> Waiting for Andrew to start<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
+        </div>
+        <p class="hint host-only" style="text-align:center">2 of 3 players ready · the host can start with 2 or more players</p>
+      </section>
+    </div>
+
+    <aside class="stack">
+      <section class="panel">
+        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px">21 × 21 · new map every round</span></div>
+        <div style="padding:14px"><div class="map-preview arena-host"><canvas id="preview" aria-hidden="true"></canvas><div class="veil">Revealed at the countdown</div></div></div>
+      </section>
+      <section class="panel panel-pad">
+        <h2 style="font-size:16px;margin-bottom:12px">Controls</h2>
+        <div class="keys">
+          <span class="k"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></span><span class="muted">Move (or arrow keys)</span>
+          <span class="k"><span class="kbd">Space</span></span><span class="muted">Drop a bomb</span>
+          <span class="k"><span class="kbd">Esc</span></span><span class="muted">Menu</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  Arena.mount(document.getElementById('preview'), { seed: 42, density: 0.65, still: true });
+</script>
+</body>
+</html>

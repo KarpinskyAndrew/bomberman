@@ -5,6 +5,7 @@
 | **Version** | 0.3 (draft) |
 | **Date** | 2026-11-11 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Netcode: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
+| **Mockups** | [mockups/index.html](./mockups/index.html): static HTML layouts of every screen and state in §3–4 (open locally in a browser) |
 
 **Changes in 0.3:**
 

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="landing.html">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="19" r="10" fill="#1b2133" stroke="#2c3550" stroke-width="1.5"/><circle cx="10.5" cy="15.5" r="3" fill="#fff" opacity=".3"/><path d="M20 11q3-5 7-4" stroke="#c9a46a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="27.5" cy="6.5" r="3" fill="#ffb02e"/></svg>
+    <span>BomberMan <b>Online</b></span>
+  </a>
+  <nav class="nav">
+    <a href="lobby.html"><svg class="i"><use href="#i-grid"/></svg> <span>Lobby</span></a>
+    <a href="leaderboard.html" aria-current="page"><svg class="i"><use href="#i-trophy"/></svg> <span>Leaderboard</span></a>
+  </nav>
+  <div class="spacer"></div>
+  <span class="ping num"><span class="txt">EU ·</span> 24 ms</span>
+  <a class="icon-btn" href="lobby.html#settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></a>
+  <a class="user-chip" href="profile.html"><span class="avatar">A</span><span class="who"><b>Andrew</b><span class="tier tier-gold num">1342</span></span></a>
+</header>
+
+<main class="page">
+  <h1 class="page-title">Leaderboard</h1>
+  <p class="muted" style="margin-top:6px">Registered players with at least 10 rated matches. No seasons, no resets.</p>
+
+  <section class="podium" id="podium" aria-label="Top 3"></section>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table class="table lb-table">
+        <thead><tr><th class="r">#</th><th>Player</th><th>Tier</th><th class="r">Rating</th><th class="r">Matches</th><th class="r">Win %</th></tr></thead>
+        <tbody class="num" id="rows"></tbody>
+      </table>
+    </div>
+    <div class="pager"><a class="btn btn-sm" aria-disabled="true" href="#">‹ Prev</a><span class="num">Page 1 / 40</span><a class="btn btn-sm" href="#">Next ›</a></div>
+  </section>
+</main>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  const names = ['blastqueen', 'kaboom_kid', 'fuse_lord', 'mira', 'tomtom', 'ZigZag', 'pyro_pete', 'bombastic', 'nova', 'kittyboom',
+    'chain_react', 'Lumen', 'tick_tock', 'fireweaver', 'old_sparky', 'Brick', 'quietstorm', 'Ash', 'r4ndom', 'dynamo',
+    'pixel_kate', 'Overclock', 'grenadine', 'boomerang', 'SolarFlare'];
+  const tierOf = r => r >= 1700 ? 'diamond' : r >= 1500 ? 'platinum' : r >= 1300 ? 'gold' : r >= 1100 ? 'silver' : 'bronze';
+  const cap = s => s[0].toUpperCase() + s.slice(1);
+  let r = 1912;
+  const players = names.map((n, i) => {
+    const row = { rank: i + 1, name: n, rating: r, matches: 120 + ((i * 97) % 420), win: 38 - Math.floor(i / 3) };
+    r -= i < 2 ? 38 : 9 + ((i * 7) % 11);
+    return row;
+  });
+  const row = p => `<tr${p.me ? ' class="me"' : ''}>
+      <td class="r"><b>${p.rank}</b></td>
+      <td><a href="profile.html">${p.me ? '► ' : ''}${p.name}</a></td>
+      <td><span class="tier tier-${tierOf(p.rating)}">${cap(tierOf(p.rating))}</span></td>
+      <td class="r"><b>${p.rating}</b></td>
+      <td class="r">${p.matches}</td>
+      <td class="r">${p.win} %</td></tr>`;
+  document.getElementById('rows').innerHTML =
+    players.map(row).join('') +
+    '<tr class="pinned-sep"><td colspan="6">· · ·</td></tr>' +
+    row({ rank: 87, name: 'Andrew', rating: 1342, matches: 42, win: 31, me: true });
+  document.getElementById('podium').innerHTML = players.slice(0, 3).map(p => `
+    <a class="pod r${p.rank}" href="profile.html">
+      <span class="rank">${p.rank}</span>
+      <span><b>${p.name}</b><span class="tier tier-${tierOf(p.rating)}" style="font-size:13px">${cap(tierOf(p.rating))}</span></span>
+      <span class="r"><b>${p.rating}</b><br><span class="dim" style="font-size:12px">${p.matches} matches</span></span>
+    </a>`).join('');
+</script>
+</body>
+</html>

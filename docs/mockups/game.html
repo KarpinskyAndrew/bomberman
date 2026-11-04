@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In-game · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body class="game-body" data-states="countdown|Countdown;sudden|Sudden death;hit|Hit by a bomb;round-end|Round end;eaten|Eaten by an alien;spectating|Spectating;esc|ESC menu;version|New version available">
+<i id="sudden" class="anchor"></i><i id="hit" class="anchor"></i>
+
+<div class="game">
+  <header class="hud-top">
+    <span class="clock"><svg class="i"><use href="#i-clock"/></svg><span class="sd-normal">1:42</span><span class="sd-active">2:38</span></span>
+    <span class="round-title">Friday Blast · <b>ROUND 2 / 3</b></span>
+    <span class="sd-chip"><svg class="i"><use href="#i-warn"/></svg> <span class="txt">SUDDEN DEATH</span> <span class="sd-normal num">in 0:22</span><span class="sd-active">NOW</span></span>
+    <span class="ping num">24 ms</span>
+    <a class="icon-btn" href="#esc" aria-label="Menu (Esc)"><svg class="i"><use href="#i-pause"/></svg></a>
+  </header>
+
+  <aside class="hud-side left" aria-label="Players">
+    <div class="pcard me" style="--pc:var(--p1)">
+      <div class="top"><span class="swatch"></span><b>Andrew</b><span class="you">YOU</span><span class="crown"><svg class="i"><use href="#i-crown"/></svg></span><span class="pips"><i class="on"></i><i></i></span></div>
+      <span class="hearts" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/2</span></div>
+      <span class="warn-eye"><svg class="i"><use href="#i-eye"/></svg> Seeker is hunting you</span>
+    </div>
+    <div class="pcard out" style="--pc:var(--p3)">
+      <div class="top"><span class="swatch"></span><b>Kate</b><span class="pips"><i></i><i></i></span></div>
+      <span class="state"><svg class="i"><use href="#i-skull"/></svg> Eliminated</span>
+    </div>
+    <div class="aliens-box">
+      <b style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)">Aliens · 3 / 4</b>
+      <span class="row"><span class="alien-dot" style="background:#5fd35a"></span> Drifter <span class="dim">· wanders</span></span>
+      <span class="row"><span class="alien-dot" style="background:#9b5de5"></span> Seeker <span class="dim">· hunts</span></span>
+      <span class="row"><span class="alien-dot" style="background:#c0392b"></span> Brute <span class="dim">· 3 HP</span></span>
+      <span class="dim" style="font-size:12px">Touching an alien kills instantly.</span>
+    </div>
+  </aside>
+
+  <main class="stage arena-host">
+    <canvas id="arena" aria-label="Arena"></canvas>
+    <div class="hit-flash" aria-hidden="true"></div>
+    <div class="sd-hint"><svg class="i" style="color:var(--bad)"><use href="#i-clock"/></svg> At 3:00 the player with the most ♥ wins</div>
+
+    <!-- Countdown -->
+    <section class="overlay dim" id="countdown" aria-live="assertive">
+      <div class="cd">
+        <div class="lbl">ROUND 2</div>
+        <div class="nums" aria-hidden="true"><span>3</span><span>2</span><span>1</span><span>GO!</span></div>
+        <p class="muted" style="font-size:14px">Your spawn is pulsing <span style="color:var(--p1);font-weight:700">blue</span></p>
+      </div>
+    </section>
+
+    <!-- Round end -->
+    <section class="overlay" id="round-end">
+      <div class="banner">
+        <h3>ROUND 2</h3>
+        <div class="big"><svg class="i"><use href="#i-flag"/></svg> Guest-4821 takes the round!</div>
+        <div class="score-grid num">
+          <span class="h"></span><span class="h">Andrew</span><span class="h">Guest-4821</span><span class="h">Kate</span>
+          <span class="h">Score</span>
+          <span class="p" style="--pc:var(--p1)"><span class="pips"><i class="on"></i><i></i></span></span>
+          <span class="p" style="--pc:var(--p2)"><span class="pips"><i class="on"></i><i></i></span></span>
+          <span class="p" style="--pc:var(--p3)"><span class="pips"><i></i><i></i></span></span>
+          <span class="h">Points</span><span>5</span><span>5</span><span>2</span>
+        </div>
+        <p class="muted" style="margin-top:14px;font-size:14px">Deciding round starts in 4 s…</p>
+        <div class="bar"><i></i></div>
+      </div>
+    </section>
+
+    <!-- Eaten by an alien -->
+    <section class="overlay dim" id="eaten" aria-live="assertive">
+      <div class="death">
+        <div class="portrait"><canvas id="brute-portrait" aria-hidden="true"></canvas></div>
+        <h2>Eaten by a Brute</h2>
+        <p class="muted" style="margin:6px 0 16px">Aliens kill on contact, no matter how much ♥ you have.</p>
+        <a class="btn" href="#spectating"><svg class="i"><use href="#i-eye"/></svg> Spectate</a>
+      </div>
+    </section>
+
+    <!-- Spectating -->
+    <section class="overlay" id="spectating">
+      <div class="spectate-bar">
+        <svg class="i"><use href="#i-eye"/></svg>
+        <span><b>Spectating</b> <span class="muted">· you were eliminated this round</span></span>
+        <a class="btn btn-sm btn-danger" href="lobby.html"><svg class="i"><use href="#i-logout"/></svg> Leave arena</a>
+      </div>
+    </section>
+  </main>
+
+  <aside class="hud-side right" aria-label="Opponents">
+    <div class="pcard" style="--pc:var(--p2)">
+      <div class="top"><span class="swatch"></span><b>Guest-4821</b><span class="pips"><i class="on"></i><i></i></span></div>
+      <span class="hearts" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/1</span></div>
+    </div>
+    <div class="pcard empty" style="--pc:#2b3247">
+      <div class="top"><span class="swatch"></span><b>Empty slot</b></div>
+      <span>No fourth player</span>
+    </div>
+  </aside>
+
+  <footer class="killfeed" aria-live="polite">
+    <span class="lbl">Feed</span>
+    <span class="ev"><b style="color:var(--p1)">Andrew</b> <svg class="i" style="color:var(--fire-2)"><use href="#i-bomb"/></svg> Seeker <span class="dim">(+bomb)</span></span>
+    <span class="ev"><b style="color:var(--p3)">Kate</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
+    <span class="ev"><b style="color:var(--p2)">Guest-4821</b> picked up <svg class="i" style="color:var(--fire-2)"><use href="#i-fire"/></svg></span>
+  </footer>
+</div>
+
+<!-- ESC menu -->
+<div class="modal" id="esc" role="dialog" aria-modal="true" aria-labelledby="esc-t">
+  <div class="modal-card" style="width:min(380px,100%)">
+    <div class="modal-head"><h2 id="esc-t">Paused for you</h2><span class="kbd">Esc</span></div>
+    <div class="modal-body">
+      <p class="hint">The match keeps running for everyone else.</p>
+      <a class="btn btn-primary btn-lg btn-block" href="#"><svg class="i"><use href="#i-play"/></svg> Resume</a>
+      <a class="btn btn-lg btn-block" href="lobby.html#settings"><svg class="i"><use href="#i-gear"/></svg> Settings</a>
+      <a class="btn btn-lg btn-block btn-danger" href="lobby.html"><svg class="i"><use href="#i-logout"/></svg> Leave arena</a>
+      <div class="alert warn"><svg class="i"><use href="#i-warn"/></svg><span>Leaving now counts as a forfeit: you're ranked last in this match.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- New version available -->
+<div class="modal" id="version" role="dialog" aria-modal="true" aria-labelledby="ver-t">
+  <div class="modal-card" style="width:min(400px,100%)">
+    <div class="modal-head"><h2 id="ver-t">Update available</h2></div>
+    <div class="modal-body">
+      <p>A new version of BomberMan Online is available. Reload to keep playing.</p>
+      <p class="hint">Your game client is too old for this server (protocol mismatch).</p>
+    </div>
+    <div class="modal-foot"><a class="btn btn-primary" href="game.html"><svg class="i"><use href="#i-refresh"/></svg> Reload</a></div>
+  </div>
+</div>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  const C = Arena.COLORS;
+  function scene() {
+    const h = location.hash.slice(1);
+    const base = {
+      seed: 23, density: 0.62, names: true,
+      players: [
+        { x: 5, y: 3, color: C.p1, name: 'Andrew', dir: 'r', blink: h === 'hit' },
+        { x: 15, y: 9, color: C.p2, name: 'Guest-4821', dir: 'l' }
+      ],
+      aliens: [
+        { type: 'seeker', x: 7, y: 5, locked: true, target: [5, 3] },
+        { type: 'drifter', x: 11, y: 13 },
+        { type: 'brute', x: 17, y: 15, hp: 2 }
+      ],
+      bombs: [{ x: 15, y: 7 }, { x: 3, y: 5, fast: true }],
+      fires: [{ x: 9, y: 11, range: 3 }],
+      items: [{ x: 9, y: 1, kind: 'health' }, { x: 3, y: 9, kind: 'fire' }, { x: 13, y: 15, kind: 'bomb' }],
+      danger: [[3, 5], [3, 4], [3, 3], [3, 6], [3, 7], [2, 5], [1, 5], [4, 5], [5, 5]]
+    };
+    if (h === 'countdown') {
+      return { seed: 23, density: 0.62, spawnPulse: true, names: true,
+        players: [{ x: 1, y: 1, color: C.p1, name: 'Andrew' }, { x: 19, y: 1, color: C.p2, name: 'Guest-4821' }, { x: 1, y: 19, color: C.p3, name: 'Kate' }] };
+    }
+    if (h === 'sudden') base.falling = [[1, 1], [2, 1], [3, 1], [1, 2], [1, 3]];
+    if (h === 'eaten' || h === 'spectating') {
+      base.players[0].dead = true;
+      base.aliens[2] = { type: 'brute', x: 5, y: 3, hp: 2 };
+      base.aliens[0] = { type: 'seeker', x: 7, y: 5, locked: true, target: [15, 9] };
+    }
+    if (h === 'round-end') base.still = true;
+    return base;
+  }
+  const view = Arena.mount(document.getElementById('arena'), scene());
+  window.addEventListener('hashchange', () => view.update(scene()));
+  Arena.portrait(document.getElementById('brute-portrait'), { type: 'brute', hp: 3 }, 88);
+</script>
+</body>
+</html>

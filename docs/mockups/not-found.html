@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="landing.html">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="19" r="10" fill="#1b2133" stroke="#2c3550" stroke-width="1.5"/><circle cx="10.5" cy="15.5" r="3" fill="#fff" opacity=".3"/><path d="M20 11q3-5 7-4" stroke="#c9a46a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="27.5" cy="6.5" r="3" fill="#ffb02e"/></svg>
+    <span>BomberMan <b>Online</b></span>
+  </a>
+  <nav class="nav">
+    <a href="lobby.html"><svg class="i"><use href="#i-grid"/></svg> <span>Lobby</span></a>
+    <a href="leaderboard.html"><svg class="i"><use href="#i-trophy"/></svg> <span>Leaderboard</span></a>
+  </nav>
+</header>
+
+<main class="nf">
+  <div>
+    <div class="arena-host" aria-hidden="true"><canvas id="strip"></canvas></div>
+    <div class="code">404</div>
+    <h1>This tile is a hard wall</h1>
+    <p>The page you're looking for got blown up, or it never existed. No bomb can get you through this one.</p>
+    <div class="row" style="justify-content:center">
+      <a class="btn btn-primary" href="lobby.html"><svg class="i"><use href="#i-arrow-left"/></svg> Back to the lobby</a>
+      <a class="btn" href="landing.html">Home</a>
+    </div>
+  </div>
+</main>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  // A thin slice through the middle of an arena: a player between a bomb and a Drifter.
+  Arena.mount(document.getElementById('strip'), {
+    seed: 5, density: 0, cover: true, zoom: 2.5,
+    players: [{ x: 10, y: 11, color: Arena.COLORS.p1, dir: 'r' }],
+    bombs: [{ x: 9, y: 11 }],
+    aliens: [{ type: 'drifter', x: 12, y: 11 }],
+    items: [{ x: 11, y: 9, kind: 'fire' }]
+  });
+</script>
+</body>
+</html>

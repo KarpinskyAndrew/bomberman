@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lobby · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body data-states="as-guest|Signed in as guest;quickplay|Quick Play searching;create|Create arena (ranked);create-private|Create arena (private);join|Join by code;join-error|Join by code (wrong code);settings|Settings">
+<i id="as-guest" class="anchor"></i>
+
+<header class="topbar">
+  <a class="brand" href="landing.html">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="19" r="10" fill="#1b2133" stroke="#2c3550" stroke-width="1.5"/><circle cx="10.5" cy="15.5" r="3" fill="#fff" opacity=".3"/><path d="M20 11q3-5 7-4" stroke="#c9a46a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="27.5" cy="6.5" r="3" fill="#ffb02e"/></svg>
+    <span>BomberMan <b>Online</b></span>
+  </a>
+  <nav class="nav">
+    <a href="lobby.html" aria-current="page"><svg class="i"><use href="#i-grid"/></svg> <span>Lobby</span></a>
+    <a href="leaderboard.html"><svg class="i"><use href="#i-trophy"/></svg> <span>Leaderboard</span></a>
+  </nav>
+  <div class="spacer"></div>
+  <span class="ping num"><span class="txt">EU ·</span> 24 ms</span>
+  <a class="icon-btn" href="#settings" aria-label="Settings"><svg class="i"><use href="#i-gear"/></svg></a>
+  <a class="user-chip user-only" href="profile.html">
+    <span class="avatar">A</span>
+    <span class="who"><b>Andrew</b><span class="tier tier-gold num">1342</span></span>
+  </a>
+  <a class="user-chip guest-only" href="landing.html#register">
+    <span class="avatar guest">G</span>
+    <span class="who"><b>Guest-4821</b><span class="dim">guest</span></span>
+  </a>
+</header>
+
+<main class="page">
+  <h1 class="page-title">Lobby</h1>
+
+  <section class="actions" aria-label="Play">
+    <a class="action primary" href="#quickplay">
+      <span class="ico"><svg class="i"><use href="#i-bolt"/></svg></span>
+      <span><b>Quick Play · Ranked</b><span>Best ping, then players near your rating</span></span>
+    </a>
+    <a class="action" href="#create">
+      <span class="ico"><svg class="i"><use href="#i-plus"/></svg></span>
+      <span><b>Create arena</b><span>Public or private, your rules</span></span>
+    </a>
+    <a class="action" href="#join">
+      <span class="ico"><svg class="i"><use href="#i-hash"/></svg></span>
+      <span><b>Join by code</b><span>Got a 6-letter invite code?</span></span>
+    </a>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Open arenas</h2>
+      <span class="muted num" style="font-size:13px">24 waiting · 97 running</span>
+    </div>
+    <div class="filters">
+      <select class="select" aria-label="Region"><option>All regions</option><option>EU (Frankfurt)</option><option>EU-PL (Warsaw)</option><option>EU-FI (Finland)</option></select>
+      <select class="select" aria-label="Mode"><option>Ranked + Unrated</option><option>Ranked only</option><option>Unrated only</option></select>
+      <label class="check"><input type="checkbox"> Hide full</label>
+      <div class="input-icon"><svg class="i"><use href="#i-search"/></svg><input class="input" placeholder="Search arenas" aria-label="Search arenas"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Arena</th><th>Mode</th><th>Region</th><th class="r">Ping</th><th>Players</th><th class="r">Avg rating</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr class="is-new">
+            <td><span class="arena-name">Friday Blast</span></td>
+            <td><span class="badge badge-ranked" title="Standard rules · rated for registered players"><svg class="i"><use href="#i-star"/></svg> Ranked</span> <span class="dim">Bo3</span></td>
+            <td>EU</td><td class="r num">24 ms</td>
+            <td><span class="slots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span> <span class="num">3/4</span></td>
+            <td class="r"><span class="tier tier-gold num">1310</span></td>
+            <td><span class="status-wait">Waiting</span></td>
+            <td class="r"><a class="btn btn-sm btn-primary" href="waiting-room.html">Join</a></td>
+          </tr>
+          <tr>
+            <td><span class="arena-name">noobs only</span></td>
+            <td><span class="badge badge-unrated">Unrated</span> <span class="dim">Bo5</span></td>
+            <td>EU</td><td class="r num">24 ms</td>
+            <td><span class="slots"><i class="on"></i><i class="on"></i><i></i><i></i></span> <span class="num">2/4</span></td>
+            <td class="r dim">–</td>
+            <td><span class="status-live num">Round 2/5 · 1–0</span></td>
+            <td class="r"><span class="btn btn-sm" aria-disabled="true">In game</span></td>
+          </tr>
+          <tr>
+            <td><span class="arena-name"><svg class="i"><use href="#i-lock"/></svg> private</span></td>
+            <td><span class="badge badge-unrated">Unrated</span> <span class="dim">Bo3</span></td>
+            <td>EU-PL</td><td class="r num">38 ms</td>
+            <td><span class="slots"><i class="on"></i><i></i><i></i><i></i></span> <span class="num">1/4</span></td>
+            <td class="r dim">–</td>
+            <td><span class="status-wait">Waiting</span></td>
+            <td class="r"><a class="btn btn-sm" href="#join">Code</a></td>
+          </tr>
+          <tr>
+            <td><span class="arena-name">Diamond lounge</span></td>
+            <td><span class="badge badge-ranked"><svg class="i"><use href="#i-star"/></svg> Ranked</span> <span class="dim">Bo3</span></td>
+            <td>EU</td><td class="r num">26 ms</td>
+            <td><span class="slots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span> <span class="num">4/4</span></td>
+            <td class="r"><span class="tier tier-diamond num">1781</span></td>
+            <td><span class="muted">Full</span></td>
+            <td class="r"><span class="btn btn-sm" aria-disabled="true">Full</span></td>
+          </tr>
+          <tr>
+            <td><span class="arena-name">bombs &amp; coffee</span></td>
+            <td><span class="badge badge-ranked"><svg class="i"><use href="#i-star"/></svg> Ranked</span> <span class="dim">Bo3</span></td>
+            <td>EU</td><td class="r num">27 ms</td>
+            <td><span class="slots"><i class="on"></i><i class="on"></i><i></i><i></i></span> <span class="num">2/4</span></td>
+            <td class="r"><span class="tier tier-silver num">1188</span></td>
+            <td><span class="status-wait">Waiting</span></td>
+            <td class="r"><a class="btn btn-sm btn-primary" href="waiting-room.html">Join</a></td>
+          </tr>
+          <tr class="faded" title="High ping: you may notice lag">
+            <td><span class="arena-name">late night chaos</span></td>
+            <td><span class="badge badge-unrated">Unrated</span> <span class="dim">Bo1</span></td>
+            <td>EU-FI</td><td class="r num"><span style="color:var(--fire-1)"><svg class="i"><use href="#i-warn"/></svg> 142 ms</span></td>
+            <td><span class="slots"><i class="on"></i><i class="on"></i><i></i><i></i></span> <span class="num">2/4</span></td>
+            <td class="r dim">–</td>
+            <td><span class="status-wait">Waiting</span></td>
+            <td class="r"><a class="btn btn-sm" href="waiting-room.html">Join</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="panel me-bar user-only">
+    <span class="avatar">A</span>
+    <b>You</b>
+    <span class="tier tier-gold">Gold · <span class="num">1342</span></span>
+    <span class="muted num">#87</span>
+    <span class="sep"></span>
+    <span class="stat muted"><b class="num" style="color:var(--ink)">42</b> matches</span>
+    <span class="stat muted"><b class="num" style="color:var(--ink)">13</b> wins</span>
+    <span class="stat muted"><b class="num" style="color:var(--ink)">88</b> kills</span>
+    <span class="stat muted"><b class="num" style="color:var(--ink)">140</b> aliens</span>
+  </div>
+  <div class="panel me-bar guest-only">
+    <span class="avatar guest">G</span>
+    <span>You're playing as <b>Guest-4821</b>. <span class="muted">Register to get a rating, a profile and your stats saved.</span></span>
+    <span class="spacer"></span>
+    <a class="btn btn-primary btn-sm" href="landing.html#register">Register</a>
+  </div>
+</main>
+
+<!-- Quick Play searching -->
+<div class="modal" id="quickplay" role="dialog" aria-modal="true" aria-labelledby="qp-t">
+  <div class="modal-card search-card">
+    <div class="modal-body">
+      <div class="radar" aria-hidden="true"></div>
+      <h2 id="qp-t" class="display" style="font-size:20px">Finding a match<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></h2>
+      <p class="muted" style="font-size:14px">Ranked · EU (24 ms) · arenas near <span class="tier tier-gold num">1342</span> ± 200</p>
+      <p class="dim num" style="font-size:13px">0:07 · No match? We'll open a new ranked arena for you.</p>
+      <a class="btn" href="#">Cancel</a>
+    </div>
+  </div>
+</div>
+
+<!-- Create arena: ranked (custom rules locked) -->
+<div class="modal" id="create" role="dialog" aria-modal="true" aria-labelledby="ca-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="ca-t">Create arena</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="an">Name</label><input class="input" id="an" value="Friday Blast" maxlength="32"></div>
+      <div class="field"><label class="label" for="ar">Region</label><select class="select" id="ar"><option>EU · Frankfurt (24 ms)</option><option>EU-PL · Warsaw (38 ms)</option></select></div>
+      <div class="field"><span class="label">Max players</span>
+        <div class="seg"><input type="radio" name="mp" id="mp2"><label for="mp2">2</label><input type="radio" name="mp" id="mp3"><label for="mp3">3</label><input type="radio" name="mp" id="mp4" checked><label for="mp4">4</label></div>
+      </div>
+      <div class="setting"><span class="txt">Private<small>Hidden from the list, joined with an invite code</small></span><a class="toggle" href="#create-private" aria-label="Make private"><input type="checkbox" tabindex="-1"><span></span></a></div>
+      <div class="field"><span class="label">Game mode</span>
+        <div class="seg"><input type="radio" name="gm" id="gm-r" checked><label for="gm-r">Ranked</label><input type="radio" name="gm" id="gm-u"><label for="gm-u">Unrated</label></div>
+      </div>
+      <div class="divider-label">Custom rules · Unrated only</div>
+      <div class="field locked"><span class="label">Format <svg class="i"><use href="#i-lock"/></svg></span>
+        <div class="seg"><input type="radio" name="bo" id="bo1" disabled><label for="bo1">Bo1</label><input type="radio" name="bo" id="bo3" checked disabled><label for="bo3">Bo3</label><input type="radio" name="bo" id="bo5" disabled><label for="bo5">Bo5</label></div>
+      </div>
+      <div class="field locked"><span class="label">Wall density <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="100" value="65" disabled><output>65 %</output></div></div>
+      <div class="field locked"><span class="label">Wall drops <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="60" value="30" disabled><output>30 %</output></div></div>
+      <div class="field locked"><span class="label">Aliens <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="8" value="4" disabled><output>max 4</output></div></div>
+      <p class="hint">Ranked arenas always use the standard rules, so ratings stay comparable.</p>
+    </div>
+    <div class="modal-foot"><a class="btn btn-ghost" href="#">Cancel</a><a class="btn btn-primary" href="waiting-room.html">Create</a></div>
+  </div>
+</div>
+
+<!-- Create arena: private (unrated, rules editable) -->
+<div class="modal" id="create-private" role="dialog" aria-modal="true" aria-labelledby="cp-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="cp-t">Create arena</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="pn">Name</label><input class="input" id="pn" value="Kate's birthday"></div>
+      <div class="field"><label class="label" for="pr">Region</label><select class="select" id="pr"><option>EU · Frankfurt (24 ms)</option></select></div>
+      <div class="field"><span class="label">Max players</span>
+        <div class="seg"><input type="radio" name="pmp" id="pmp2"><label for="pmp2">2</label><input type="radio" name="pmp" id="pmp3" checked><label for="pmp3">3</label><input type="radio" name="pmp" id="pmp4"><label for="pmp4">4</label></div>
+      </div>
+      <div class="setting"><span class="txt">Private<small>An invite code is created with the arena</small></span><a class="toggle" href="#create" aria-label="Make public"><input type="checkbox" checked tabindex="-1"><span></span></a></div>
+      <div class="field"><span class="label">Game mode</span>
+        <div class="seg"><input type="radio" name="pgm" id="pgm-r" disabled><label for="pgm-r">Ranked</label><input type="radio" name="pgm" id="pgm-u" checked><label for="pgm-u">Unrated</label></div>
+        <span class="hint">Private arenas are always unrated.</span>
+      </div>
+      <div class="divider-label">Custom rules</div>
+      <div class="field"><span class="label">Format</span>
+        <div class="seg"><input type="radio" name="pbo" id="pbo1"><label for="pbo1">Bo1</label><input type="radio" name="pbo" id="pbo3"><label for="pbo3">Bo3</label><input type="radio" name="pbo" id="pbo5" checked><label for="pbo5">Bo5</label></div>
+      </div>
+      <div class="field"><span class="label">Wall density</span><div class="range-row"><input type="range" min="0" max="100" value="80"><output>80 %</output></div></div>
+      <div class="field"><span class="label">Wall drops</span><div class="range-row"><input type="range" min="0" max="60" value="45"><output>45 %</output></div></div>
+      <div class="field"><label class="check"><input type="checkbox" checked> Aliens</label><div class="range-row"><input type="range" min="0" max="8" value="6"><output>max 6</output></div></div>
+    </div>
+    <div class="modal-foot"><a class="btn btn-ghost" href="#">Cancel</a><a class="btn btn-primary" href="waiting-room.html#private">Create</a></div>
+  </div>
+</div>
+
+<!-- Join by code -->
+<div class="modal" id="join" role="dialog" aria-modal="true" aria-labelledby="jc-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="jc-t">Join by code</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <p class="muted" style="font-size:14px">Enter the 6-character code your friend shared.</p>
+      <div class="code-boxes" aria-label="Invite code"><span>K</span><span>7</span><span>M</span><span>2</span><span class="cur"></span><span></span></div>
+      <p class="hint" style="text-align:center">Links like bomberman.space/arena/…?code=K7M2QX join directly.</p>
+    </div>
+    <div class="modal-foot"><a class="btn btn-ghost" href="#">Cancel</a><a class="btn btn-primary" href="#join-error">Join</a></div>
+  </div>
+</div>
+
+<!-- Join by code: error -->
+<div class="modal" id="join-error" role="dialog" aria-modal="true" aria-labelledby="je-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="je-t">Join by code</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <p class="muted" style="font-size:14px">Enter the 6-character code your friend shared.</p>
+      <div class="code-boxes err" aria-label="Invite code"><span>K</span><span>7</span><span>M</span><span>2</span><span>Q</span><span>Z</span></div>
+      <div class="alert err"><svg class="i"><use href="#i-warn"/></svg><span>No arena with this code. It may have closed. Check the code and try again.</span></div>
+    </div>
+    <div class="modal-foot"><a class="btn btn-ghost" href="#">Cancel</a><a class="btn btn-primary" href="waiting-room.html#private">Join</a></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal" id="settings" role="dialog" aria-modal="true" aria-labelledby="st-t">
+  <div class="modal-card wide">
+    <div class="modal-head"><h2 id="st-t">Settings</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="tabs">
+      <input type="radio" name="tab" id="tab-controls" checked>
+      <input type="radio" name="tab" id="tab-audio">
+      <input type="radio" name="tab" id="tab-display">
+      <input type="radio" name="tab" id="tab-network">
+      <div class="tab-list" role="tablist">
+        <label for="tab-controls"><svg class="i"><use href="#i-keyboard"/></svg> Controls</label>
+        <label for="tab-audio"><svg class="i"><use href="#i-volume"/></svg> Audio</label>
+        <label for="tab-display"><svg class="i"><use href="#i-monitor"/></svg> Display</label>
+        <label for="tab-network"><svg class="i"><use href="#i-wifi"/></svg> Network</label>
+      </div>
+      <div class="tab-panel controls">
+        <div class="setting"><span class="txt">Move up</span><span class="row"><span class="kbd">W</span><span class="kbd">↑</span></span></div>
+        <div class="setting"><span class="txt">Move down</span><span class="row"><span class="kbd">S</span><span class="kbd">↓</span></span></div>
+        <div class="setting"><span class="txt">Move left</span><span class="row"><span class="kbd">A</span><span class="kbd">←</span></span></div>
+        <div class="setting"><span class="txt">Move right</span><span class="row"><span class="kbd">D</span><span class="kbd">→</span></span></div>
+        <div class="setting"><span class="txt">Drop bomb<small>Press a key to rebind…</small></span><span class="row"><span class="kbd rebind">…</span><span class="kbd">Enter</span></span></div>
+        <div class="setting"><span class="txt">Menu</span><span class="row"><span class="kbd">Esc</span></span></div>
+        <div style="padding-top:12px"><a class="btn btn-sm" href="#settings">Reset to defaults</a></div>
+      </div>
+      <div class="tab-panel audio">
+        <div class="field" style="padding:8px 0"><span class="label">Master</span><div class="range-row"><input type="range" value="80"><output>80</output></div></div>
+        <div class="field" style="padding:8px 0"><span class="label">Sound effects</span><div class="range-row"><input type="range" value="100"><output>100</output></div></div>
+        <div class="field" style="padding:8px 0"><span class="label">Music</span><div class="range-row"><input type="range" value="55"><output>55</output></div></div>
+        <div class="setting"><span class="txt">Mute everything</span><span class="toggle"><input type="checkbox"><span></span></span></div>
+      </div>
+      <div class="tab-panel display">
+        <div class="setting"><span class="txt">Arena scale<small>Integer scaling keeps pixels crisp</small></span>
+          <span class="seg"><input type="radio" name="sc" id="sc-a" checked><label for="sc-a">Auto</label><input type="radio" name="sc" id="sc-2"><label for="sc-2">2×</label><input type="radio" name="sc" id="sc-3"><label for="sc-3">3×</label></span></div>
+        <div class="setting"><span class="txt">Show ping</span><span class="toggle"><input type="checkbox" checked><span></span></span></div>
+        <div class="setting"><span class="txt">Show FPS</span><span class="toggle"><input type="checkbox"><span></span></span></div>
+        <div class="setting"><span class="txt">Danger preview<small>Tint tiles that are about to be hit by fire</small></span><span class="toggle"><input type="checkbox" checked><span></span></span></div>
+        <div class="setting"><span class="txt">Reduced motion<small>No screen flashes or shake</small></span><span class="toggle"><input type="checkbox"><span></span></span></div>
+        <div class="setting"><span class="txt">Colorblind palette</span><span class="toggle"><input type="checkbox"><span></span></span></div>
+      </div>
+      <div class="tab-panel network">
+        <div class="field" style="padding:8px 0"><label class="label" for="ro">Region</label><select class="select" id="ro"><option>Auto · EU Frankfurt (24 ms)</option><option>EU-PL Warsaw (38 ms)</option><option>EU-FI Finland (142 ms)</option></select></div>
+        <div class="setting"><span class="txt">Interpolation<small>Smoother hides jitter, lower latency feels snappier</small></span>
+          <span class="seg"><input type="radio" name="ip" id="ip-a" checked><label for="ip-a">Auto</label><input type="radio" name="ip" id="ip-s"><label for="ip-s">Smoother</label><input type="radio" name="ip" id="ip-l"><label for="ip-l">Lower latency</label></span></div>
+      </div>
+    </div>
+    <div class="modal-foot"><a class="btn btn-primary" href="#">Done</a></div>
+  </div>
+</div>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+</body>
+</html>
