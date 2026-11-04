@@ -207,28 +207,26 @@ The **data** is JSON, validated against a **Protobuf schema attached to the topi
     { "slot": 1, "userId": "0191…", "registered": true,  "displayName": "Andrew",
       "placement": 1, "roundWins": 2, "roundPoints": 8, "forfeited": false,
       "kills": 3, "alienKills": 5, "wallsDestroyed": 41, "powerupsTaken": 11, "bombsPlaced": 97 },
-    { "slot": 2, "userId": null, "registered": false, "displayName": "Guest-4821",
-      "placement": 2, "roundWins": 1, "roundPoints": 6, "forfeited": false,
-      "kills": 1, "alienKills": 2, "wallsDestroyed": 25, "powerupsTaken": 6, "bombsPlaced": 61 },
-    { "slot": 3, "userId": "0190…", "registered": true,  "displayName": "Kate",
-      "placement": 3, "roundWins": 0, "roundPoints": 4, "forfeited": false,
-      "kills": 0, "alienKills": 1, "wallsDestroyed": 17, "powerupsTaken": 3, "bombsPlaced": 40 }
+    { "slot": 2, "userId": "0190…", "registered": true,  "displayName": "Kate",
+      "placement": 2, "roundWins": 1, "roundPoints": 7, "forfeited": false,
+      "kills": 1, "alienKills": 2, "wallsDestroyed": 25, "powerupsTaken": 6, "bombsPlaced": 61 }
   ],
   "rounds": [
     { "roundNo": 1, "seed": 884211990123, "durationMs": 183116, "result": "win", "winnerSlot": 1,
       "players": [
         { "slot": 1, "placement": 1, "points": 3, "eliminatedTick": null, "deathCause": null },
-        { "slot": 2, "placement": 2, "points": 2, "eliminatedTick": 9120, "deathCause": "bomb", "killerSlot": 1 },
-        { "slot": 3, "placement": 3, "points": 1, "eliminatedTick": 6007, "deathCause": "alien", "alienType": "brute" }
+        { "slot": 2, "placement": 2, "points": 2, "eliminatedTick": 9120, "deathCause": "bomb", "killerSlot": 1 }
       ],
       "inputLogUri": "gs://bomberman-replays/2026/10/27/0192f6c0…-r1.bin" },
-    { "roundNo": 2, "...": "…  Guest-4821 wins" },
+    { "roundNo": 2, "...": "…  Kate wins" },
     { "roundNo": 3, "...": "…  Andrew wins → 2 round wins, match decided" }
   ]
 }
 ```
 
-- **One event per best-of-3 match**, published at MATCH_END. Rounds are **not** published one at a time: rating is per match, and a half-finished match must never be partially persisted.
+The example is a ranked 1-vs-1. An unrated match has the same shape with `"mode": "unrated"`, `"bestOf": 1`, 2–4 players (guests have `"userId": null, "registered": false`) and exactly one entry in `rounds`.
+
+- **One event per match** (ranked best-of-3 or unrated single round), published at MATCH_END. Rounds are **not** published one at a time: rating is per match, and a half-finished match must never be partially persisted.
 - If the match is aborted (server drain or crash, see §9), no `match.finished` is published. If possible a `match.aborted` is published instead, and it is never rated.
 
 ---
@@ -312,13 +310,13 @@ INSERT INTO match_round_players (...) VALUES (...), ...;      -- one row per rou
 INSERT INTO user_stats (...) VALUES (...)
   ON CONFLICT (user_id) DO UPDATE SET matches_played = user_stats.matches_played + 1, ...;
 
--- 3. ELO (only if rated per spec §5.4.2, decided by internal/rating)
+-- 3. ELO (only if rated per spec §5.4.2, decided by internal/rating: ranked, exactly 2 registered players)
 SELECT user_id, rating, rated_matches
 FROM player_ratings
-WHERE user_id = ANY($registered_ids)
+WHERE user_id = ANY($registered_ids)   -- always the 2 ranked players
 ORDER BY user_id            -- consistent lock order → no deadlocks
 FOR UPDATE;
---   Go: deltas := rating.Compute(players, placements)   (pure function, unit-tested)
+--   Go: deltas := rating.Compute(a, b, result)   (pure two-player ELO, unit-tested)
 UPDATE player_ratings SET rating = ..., peak_rating = GREATEST(peak_rating, ...),
        rated_matches = rated_matches + 1, updated_at = now() WHERE user_id = ...;
 INSERT INTO rating_history (...) VALUES (...);
@@ -339,8 +337,8 @@ COMMIT;
   - Ratings are applied to the **current** rating at processing time ("processing-order ELO").
   - The deviation from strict chronological order is a few points at most and only happens under failures. This is accepted.
   - `rating_history` records the actual before and after values, so the audit trail stays consistent.
-  - Ordering keys are deliberately **not** used: a match involves several players, so there is no single key to order by.
-- **Users deleted after the match:** their `user_id` is set to null, and they are skipped in the ELO calculation.
+  - Ordering keys are deliberately **not** used: a match involves two players, so there is no single key to order by.
+- **Users deleted after the match:** their `user_id` is set to null. A ranked match whose opponent no longer exists is persisted but not rated.
 
 ### 7.4 Error handling
 
@@ -428,7 +426,7 @@ rating-worker ──COMMIT──► PostgreSQL NOTIFY 'rating_updated'
 
   | Kind | What it checks |
   |---|---|
-  | Unit | `internal/rating`: ELO math, ties, guests, K-factors, eligibility rules, floor |
+  | Unit | `internal/rating`: two-player ELO math, draws, forfeits, K-factors, eligibility rules (ranked, 2 registered players), floor |
   | Contract | Golden `match.finished` JSON vs the `.proto` schema; `buf breaking` in CI |
   | Integration (`-tags=integration`, `server/test/compose.yaml`: Postgres 17 + Pub/Sub emulator, same as CI) | Deliver the same event twice → one rating change. Deliver two events out of order → consistent history. DB down → Nack → succeeds on redelivery. |
   | Simulation | Seeded matches produce the expected event streams (golden files) |

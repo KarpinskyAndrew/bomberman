@@ -2,10 +2,18 @@
 
 | | |
 |---|---|
-| **Version** | 0.3 (draft) |
+| **Version** | 0.4 (draft) |
 | **Date** | 2026-11-11 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Netcode: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
 | **Mockups** | [mockups/index.html](./mockups/index.html): static HTML layouts of every screen and state in §3–4 (open locally in a browser) |
+
+**Changes in 0.4** (follows SPEC v0.9):
+
+- Ranked is 1-vs-1 best-of-3 for registered players only; unrated is a single round for 2–4 players. Lobby, create modal, HUD and overlays updated.
+- The waiting room has no host Start button. A 15 s all-ready countdown starts the match and pauses when someone joins (§4.4).
+- The registration form asks for the password twice.
+- Touch controls: a floating virtual joystick and a bomb button (§7.1).
+- Removed the "being hunted" warning on the own player card. The lock-on is shown on the alien itself.
 
 **Changes in 0.3:**
 
@@ -27,7 +35,7 @@
 2. **The game screen comes first.** Nothing overlaps the arena while a match is running except short, non-blocking toasts.
 3. **Retro pixel art with a modern, clean UI.** Crisp integer-scaled sprites and a dark theme.
 4. **Readable at a glance.** Each player has a distinct color and shape, alien threats are clearly telegraphed, and danger (fire about to happen) is obvious.
-5. **Keyboard first.** All menus can be used with the keyboard. The game uses arrows/WASD and SPACE.
+5. **Keyboard first, touch ready.** All menus can be used with the keyboard. On desktop the game uses arrows/WASD and SPACE; on touch devices it uses a virtual joystick and a bomb button (§7.1).
 
 ---
 
@@ -110,14 +118,15 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 ┌──────────────────────────────────────────────────────────────────────┐
 │ 💣 BomberMan   Lobby   🏆 Leaderboard     Andrew 🥇1342 ▾  ⚙  ● EU 24 ms │
 ├──────────────────────────────────────────────────────────────────────┤
-│ [ ⚡ QUICK PLAY (Ranked) ]   [ + CREATE ARENA ]   [ # JOIN BY CODE ]   │
+│ [ ⚡ QUICK PLAY (Ranked 1v1) ]  [ + CREATE ARENA ]  [ # JOIN BY CODE ] │
 │                                                                       │
 │ Filter: [All regions ▾] [Ranked+Unrated ▾] [☐ Hide full]  🔍 search    │
 │ ┌───────────────────────────────────────────────────────────────────┐ │
-│ │ Name          Mode         Region Ping Players Avg ★ Status        │ │
-│ │ Friday Blast  RANKED Bo3   EU     24ms ●●●○ 3/4 1310 Waiting [JOIN]│ │
-│ │ noobs only    unrated Bo5  EU     24ms ●●○○ 2/4  –   Round 2/5 1–0 │ │
-│ │ 🔒 private    unrated Bo3  EU-PL  38ms ●○○○ 1/4  –   Waiting [JOIN]│ │
+│ │ Name          Mode        Region Ping Players Opp ★ Status         │ │
+│ │ Friday Blast  RANKED 1v1  EU     24ms ●○   1/2 1310 Waiting  [JOIN]│ │
+│ │ duel night    RANKED 1v1  EU     24ms ●●   2/2  –   Round 2/3 1–0  │ │
+│ │ noobs only    unrated     EU     24ms ●●●○ 3/4  –   Starting 0:12  │ │
+│ │ 🔒 private    unrated     EU-PL  38ms ●○○○ 1/4  –   Waiting  [JOIN]│ │
 │ └───────────────────────────────────────────────────────────────────┘ │
 │ You: Gold · 1342 (#87) · 42 matches · 13 wins · 88 kills · 140 aliens │
 └──────────────────────────────────────────────────────────────────────┘
@@ -125,8 +134,12 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 
 - Rows update live: they animate in and out, and the player counts change in place.
 - High-ping rows (> 120 ms) are dimmed and show a warning icon.
-- Guests see a "Register to get a rating" hint instead of their rating line.
-- Ranked rows show a tooltip "Standard rules · rated for registered players".
+- **Opp ★** is the rating of the player waiting in a ranked arena, so you can pick an opponent of your level.
+- **Guests:**
+  - see a "Register to play Ranked and get a rating" hint instead of their rating line;
+  - their Quick Play button reads "⚡ QUICK PLAY" and joins an unrated arena;
+  - Ranked rows show a lock instead of [JOIN], and clicking one opens a "Register to play Ranked" prompt.
+- Ranked rows show a tooltip "1-vs-1 · best of 3 · standard rules · rated".
 
 ### 4.3 Create Arena (modal)
 
@@ -134,11 +147,11 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 ┌─ Create Arena ─────────────────────────────┐
 │ Name          [ Friday Blast           ]   │
 │ Region        [ EU (24 ms) ▾ ]             │
-│ Max players   ( 2 ) ( 3 ) (•4)             │
+│ Game mode     (•Ranked 1v1) ( Unrated )    │
 │ Private       [ ]  → invite code on create │
-│ Game mode     (•Ranked) ( Unrated )        │
+│ Max players   (•2 ) ( 3 ) ( 4 )   (locked) │
 │ ── Custom rules (Unrated only) ─────────── │
-│ Format        ( Bo1 ) (•Bo3) ( Bo5 ) (lock)│
+│ Format        Best of 3   (follows mode)    │
 │ Wall density  ───────●────  65 %  (locked) │
 │ Wall drops    ────●───────  30 %  (locked) │
 │ Aliens        [✓]  Max ──●──── 4  (locked) │
@@ -147,33 +160,43 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 ```
 
 - Turning on **Private** switches the mode to **Unrated** and disables Ranked.
-- While Ranked is selected, the custom-rule controls are disabled and show the standard values (Bo3, 65 %, 30 %, 4 aliens).
+- While Ranked is selected, max players is locked to 2 and the custom-rule controls are disabled and show the standard values (65 %, 30 %, 4 aliens).
+- The format is not a control: it follows the mode and is shown as text.
+- Guests do not see the Ranked option; the mode is fixed to Unrated.
 
 ### 4.4 Waiting Room
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ ← Leave     Friday Blast   🔒 Code: K7M2QX [copy] [copy link]      │
+│ ← Leave     noobs only   🔒 Code: K7M2QX [copy] [copy link]        │
 ├──────────────────────────────────────────────────────────────────┤
 │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐                     │
 │  │ 🟦 P1  │ │ 🟧 P2  │ │ 🟩 P3  │ │  empty │                     │
 │  │ Andrew │ │Guest-48│ │ Kate   │ │ waiting│                     │
-│  │ ★ host │ │ guest  │ │        │ │  ...   │                     │
+│  │ ★ host │ │ guest  │ │  new   │ │  ...   │                     │
 │  │ ✔ ready│ │ ✔ ready│ │ ✖      │ │        │                     │
 │  └────────┘ └────────┘ └────────┘ └────────┘                     │
-│  RANKED · Best of 3 · 65 % walls · 30 % drops · Aliens: 4        │
+│  UNRATED · 1 round · 65 % walls · 30 % drops · Aliens: 4         │
 │  Map preview: (blurred mini-map of the 21×21 layout)             │
-│            [ READY ✔ ]        [ START ▶ ] (host only, ≥ 2)       │
+│  ⏸ Countdown paused: Kate joined, waiting for her to be ready    │
+│                     [ READY ✔ ]                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+- **No Start button.** The match starts through the **15 s ready countdown** (SPEC §5.2):
+  - Fewer than 2 players: "Waiting for players…".
+  - 2+ players, not all ready: "2 of 3 ready · the match starts 15 s after everyone is ready".
+  - All ready: a large **"Starting in 15… 14…"** with a progress ring, and a short tick sound in the last 3 s. Pressing Ready again (un-ready) pauses it.
+  - Someone joins: the ring turns grey and shows **"Paused: Kate joined"**. The new card pulses until they press Ready, then the countdown restarts from 15.
+- **Ranked** waiting rooms have 2 slots and show each player's rating and tier, so you see your opponent before the countdown.
 
 ### 4.5 In-Game
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ ⏱ 1:42   Friday Blast · ROUND 2 / 3   ⚠ SUDDEN DEATH IN 0:22  ● 24 ms │
+│ ⏱ 1:42   noobs only · UNRATED        ⚠ SUDDEN DEATH IN 0:22  ● 24 ms │
 ├──────────────┬──────────────────────────────────────┬────────────────┤
-│ 🟦 Andrew ●○ │                                      │ 🟧 Guest-4821 ○○│
+│ 🟦 Andrew    │                                      │ 🟧 Guest-4821  │
 │ ❤❤❤♡♡        │                                      │ ❤❤♡♡♡          │
 │ 🔥3  💣1/2   │                                      │ 🔥2  💣0/1     │
 │              │        21 × 21 ARENA CANVAS          │                │
@@ -191,7 +214,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
   - From 2:00 the timer turns red and shows the hint "⏱ At 3:00 the player with the most ❤ wins".
   - The player cards are sorted by HP, and the current leader gets a 👑 marker.
   - The Round End banner says why the round ended: "Time! Andrew wins on health (3 ❤ vs 2 ❤)".
-- **Round-win pips** (`●○`) next to each name show round wins toward the 2 needed. A forfeited player's card is greyed out with "forfeited".
+- **Round-win pips** (`●○`) next to each name show round wins toward the 2 needed. They appear only in **ranked** matches; an unrated match is one round, so the header reads "UNRATED" instead of "ROUND 2 / 3". A forfeited player's card is greyed out with "forfeited".
 - **Collectible pickup feedback:**
   - a floating "+1 💣" text above the player,
   - the HUD stat flashes,
@@ -203,36 +226,39 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 - **Killed by an alien** (instant): a short "grabbed" animation plays, the alien's portrait appears in the death banner ("Eaten by a Brute"), and then spectating starts.
 - **Lethal alien warnings** (because contact kills instantly):
   - Every alien has a faint red **danger halo** on its occupied tile.
-  - A hunting Seeker or Brute shows a **lock-on line** toward its target, and the targeted player's own card shows a 👁 warning.
+  - A hunting Seeker or Brute shows a **lock-on line** toward its target. The warning lives on the alien only, not on the player card: you see it in the arena faster than you would read the HUD.
 - **Spectating** (after elimination): the canvas stays live with a "Spectating" banner and a [Leave arena] button.
 
 ### 4.6 Countdown, Round End & Match End overlays
 
-- **Countdown:** "ROUND 2" title, then a big "3 · 2 · 1 · GO!" over a dimmed canvas. Each player's spawn tile pulses in their color. For round 3 when the score is tied, the title reads "DECIDING ROUND".
-- **Round End** (5 s, non-blocking banner over the frozen canvas):
+- **Countdown:** "ROUND 2" title (ranked) or "GET READY" (unrated), then a big "3 · 2 · 1 · GO!" over a dimmed canvas. Each player's spawn tile pulses in their color. For ranked round 3 when the score is 1–1, the title reads "DECIDING ROUND".
+- **Round End** (5 s, non-blocking banner over the frozen canvas). In **ranked** it shows the series score:
 
 ```
-┌─ Round 2 ─────────────────────────────────────┐
-│  🏁 Guest-4821 takes the round!               │
-│  Score   Andrew ●○   Guest-4821 ●○   Kate ○○  │
-│  Points    5            5            2        │
-│  Round 3 starts in 4 s…                       │
-└───────────────────────────────────────────────┘
+┌─ Round 2 ─────────────────────────────┐
+│  🏁 Kate takes the round!             │
+│  Score   Andrew ●○   Kate ●○          │
+│  Points    5            5             │
+│  Round 3 starts in 4 s…               │
+└───────────────────────────────────────┘
 ```
 
-- **Match End** (12 s, with a countdown bar back to the waiting room):
+  In **unrated** the round is the match, so the Round End banner is skipped and Match End follows directly.
+
+- **Match End** (12 s, with a countdown bar back to the waiting room). **Ranked:**
 
 ```
-┌─ Match Over · RANKED · Best of 3 ───────────────────────────────────┐
+┌─ Match Over · RANKED 1v1 · Best of 3 ───────────────────────────────┐
 │   🏆  Andrew wins the match 2–1!                        (or DRAW)    │
 │   #  Player      R1 R2 R3  Wins Pts  Kills Aliens  Rating           │
-│   1  Andrew      🏆 2  🏆   2    8     3     5     1342 → 1356 ▲14   │
-│   2  Guest-4821  2  🏆 3    1    6     1     2     unrated          │
-│   3  Kate        3  3  2    0    4     0     1     1290 → 1276 ▼14   │
+│   1  Andrew      🏆 2  🏆   2    8     3     5     1342 → 1352 ▲10   │
+│   2  Kate        2  🏆 2    1    7     1     2     1290 → 1280 ▼10   │
 │   [ Round details ▾ ]  (deaths, killers, per-round stats)           │
 │  Back to waiting room in 9 s     [ Stay ]  [ Leave arena ]          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+  **Unrated** (one round, 2–4 players): the title is "Match Over · UNRATED", the winner line reads "Guest-4821 wins!", and the table has no R1–R3, Wins, Pts or Rating columns: `#, Player, Result (survived 2 ❤ / eaten by a Brute / blown up by Andrew), Kills, Aliens`.
 
 - **Rating column states:**
   - "updating…" (shimmer) after `match.end` with `ratingPending: true`.
@@ -317,9 +343,9 @@ web/src/
     common/     BaseButton, BaseModal, BaseSlider, Toast, Spinner, KeyCap, PingBadge
     auth/       LoginForm, RegisterForm, GuestNicknameForm
     lobby/      ArenaTable, ArenaRow, QuickPlayButton, CreateArenaDialog, JoinByCodeDialog, RegionPicker
-    arena/      WaitingRoom, PlayerSlotCard, GameStage, GameCanvas, HudPlayerCard,
+    arena/      WaitingRoom, PlayerSlotCard, ReadyCountdown, GameStage, GameCanvas, HudPlayerCard,
                 HudTimer, KillFeed, RoundScoreBar, CountdownOverlay, RoundEndOverlay, MatchEndOverlay,
-                SpectatorBanner, ReconnectOverlay, EscMenu
+                SpectatorBanner, ReconnectOverlay, EscMenu, TouchControls
     profile/    StatsSummary, MatchHistoryTable, RatingHistoryChart
     ranking/    TierBadge, RatingDelta, LeaderboardTable, RankedBadge
     settings/   SettingsDialog, KeyBindingRow
@@ -331,8 +357,9 @@ web/src/
 
 ```
 ArenaView
-├─ WaitingRoom            (phase = waiting)
-│   └─ PlayerSlotCard ×4
+├─ WaitingRoom            (phase = waiting | ready_countdown)
+│   ├─ PlayerSlotCard ×2 (ranked) / ×4 (unrated)
+│   └─ ReadyCountdown     (15 s ring: running / paused + reason)
 └─ GameStage              (phase = countdown | playing | round_end | match_end)
     ├─ HudTimer, PingBadge
     ├─ HudPlayerCard ×4   (reads hud store)
@@ -414,7 +441,7 @@ export class EventDispatcher {
 
 - Sprites are drawn at **16×16 px** per tile, so the arena is 21 × 16 = 336 px at 1×.
 - The renderer picks the largest **integer scale** that fits the available area: 2× = 672 px, 3× = 1008 px, 4× = 1344 px. It sets `imageSmoothingEnabled = false` and accounts for `devicePixelRatio` so pixels stay crisp.
-- Below a 2× fit (a very small window), it falls back to fractional scaling with smoothing off and shows a "best at ≥ 1024×768" hint.
+- Below a 2× fit (a very small window), it falls back to fractional scaling with smoothing off. On desktop it shows a "best at ≥ 1024×768" hint; on touch devices it doesn't, because a phone is a supported layout there (§7.1).
 
 ### 6.2 Layers (drawn bottom → top)
 
@@ -466,6 +493,42 @@ export class EventDispatcher {
 - **On `blur` or `visibilitychange`,** all keys are cleared, so the player does not keep walking after an alt-tab.
 - Key bindings come from the `settings` store. Defaults: Arrows + WASD for moving, SPACE for bombs, ESC for the menu.
 - *(v1.1)* Gamepad API support: d-pad/stick for movement, A for bombs.
+
+### 7.1 Touch controls (phones and tablets)
+
+WASD hints make no sense on a phone, so touch devices get on-screen controls instead (SPEC §4.3).
+
+```
+┌────────────────────────────────────┐
+│ ⏱ 1:42  ●○ Andrew ❤❤❤  Kate ❤❤ ●○ ☰│   compact top bar replaces the side panels
+├────────────────────────────────────┤
+│                                    │
+│        21 × 21 ARENA CANVAS        │   fills the width
+│                                    │
+├────────────────────────────────────┤
+│    ╭─────╮                  ╭───╮  │
+│   │   ●   │                │ 💣 │  │
+│    ╰─────╯                  ╰───╯  │
+│   joystick                 bomb    │
+└────────────────────────────────────┘
+```
+
+- **When:** `matchMedia('(pointer: coarse)')` is true, or the player turns it on in Settings ("Touch controls: Auto / On / Off"). Keyboard hints are hidden in touch mode.
+- **Virtual joystick (left):**
+  - **Floating:** the base circle appears where the thumb first touches anywhere in the left half of the control area, so the player never has to find it. It fades out on release.
+  - The thumb knob follows the finger, clamped to the base radius (≈ 60 px).
+  - The offset is snapped to the **nearest of 4 directions** (movement is tile-by-tile). A **dead zone** of 25 % of the radius means "no direction".
+  - **Hysteresis:** switching between two directions needs the angle to cross the 45° line by 10° extra, so a thumb resting on a diagonal doesn't flicker between them.
+  - It feeds the same held-direction logic as the keyboard (`InputSystem.setDirection(dir | null)`), so prediction and the server see identical commands.
+- **Bomb button (right):** a large round button (≥ 72 px, thumb-reachable bottom-right). Edge-triggered on `pointerdown`, like SPACE. It shows the bomb count (`1/2`) and greys out when no bomb is available.
+- **Menu:** the ☰ button in the top bar replaces ESC.
+- **Implementation:**
+  - Pointer Events with `setPointerCapture`, so each control tracks its own finger (multi-touch: walk and bomb at the same time).
+  - `touch-action: none` on the control layer to stop scrolling and pinch-zoom; the page sets `user-scalable=no` on the arena route only.
+  - Optional short haptic feedback (`navigator.vibrate(10)`) on bomb placement and on being hit.
+  - The control layer is a Vue component (`TouchControls.vue`) over the canvas. It writes into the plain-TS `InputSystem` and never into reactive state.
+- **Layout:** in portrait, the arena fills the width and the controls sit below it, so thumbs never cover the arena. In landscape, the arena is centered and the controls sit left and right of it.
+- **Settings:** joystick size (S/M/L), left-handed mode (swap sides), haptics on/off.
 
 ---
 
@@ -528,7 +591,7 @@ export class EventDispatcher {
 | Level | What |
 |---|---|
 | Unit (Vitest) | Codec against golden vectors, prediction subset (`sim/`) against the Go-generated rule vectors, tick for tick, prediction reconciliation, interpolation timing, input stack, hudBridge throttling |
-| Component (Vue Test Utils) | Forms, ArenaTable live updates, WaitingRoom host/ready logic, RoundEndOverlay, MatchEndOverlay (tiebreak display, rating states) |
+| Component (Vue Test Utils) | Forms, ArenaTable live updates, WaitingRoom ready countdown (start, pause on join/un-ready, restart, cancel), RegisterForm password confirmation, TouchControls direction snapping and dead zone, RoundEndOverlay, MatchEndOverlay (tiebreak display, rating states) |
 | E2E (Playwright) | Guest → Quick Play → 2-client match → results. Same flow under 100 ms ± 20 ms with 1 % loss (see Server & Network §9.2). |
 | Visual | Playwright screenshot tests of lobby, HUD and results (canvas excluded, or seeded with a fixed state) |
 

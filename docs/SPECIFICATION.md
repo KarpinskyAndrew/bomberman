@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version** | 0.8 (draft) |
+| **Version** | 0.9 (draft) |
 | **Date** | 2026-11-11 |
 | **Stack** | Go (Gin, gRPC + buf, pgx, Goose), Vue 3 + TypeScript (Vite, Pinia, Tailwind, gRPC-Web), **PostgreSQL 17**, Envoy, Google Cloud (one Compute Engine VM in v1, Pub/Sub), GitHub Actions, OpenTelemetry + Prometheus + Sentry |
 
@@ -19,6 +19,7 @@ Related documents:
 
 | Version | Changes |
 |---|---|
+| 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. |
 | 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
 | 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
 | 0.6 | **Go confirmed** for the backend after reviewing the alternatives (§6.2). The game rules stay in Go. The client re-implements only what it predicts (own movement and bomb placement), and **shared test vectors generated from the Go simulation** keep the two in sync. The networking code we write ourselves is listed and sized in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy). |
@@ -32,10 +33,10 @@ Related documents:
 
 ## 1. Overview
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a 21×21 grid, place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Each match is played as **best of 3 rounds**. Arenas run in one of two game modes:
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a 21×21 grid, place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of two game modes:
 
-- **Ranked:** registered players earn or lose **ELO rating**.
-- **Unrated:** just for fun.
+- **Ranked:** a **1-vs-1** duel between two registered players, played as **best of 3 rounds**. The winner gains **ELO rating** and the loser loses it.
+- **Unrated:** **2–4 players**, a **single round**, just for fun.
 
 ### 1.1 Goals
 
@@ -49,9 +50,8 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 ### 1.2 Non-goals (v1)
 
 - **Co-op / PvE-only modes.** Aliens exist only inside PvP arenas.
-- Mobile/touch controls (desktop keyboard only in v1).
 - In-game chat (lobby chat is a v1.1 candidate).
-- Strict skill-based matchmaking. Quick Play only *prefers* arenas with similar ratings (§5.1).
+- A ranked matchmaking queue. Ranked opponents are found through the arena list, and Quick Play only *prefers* arenas with a similar rating (§5.1).
 - Spectator mode for people outside the match (eliminated players still spectate their own match).
 
 ---
@@ -62,7 +62,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 |---|---|
 | **Arena** | A game room. It has its own map, players, aliens and match lifecycle. |
 | **Round** | A single game: one map, from countdown to the last player standing (or a draw). |
-| **Match** | A **best-of-3** series of rounds in an arena (configurable Bo1/Bo3/Bo5 in Unrated mode). ELO is applied per match. |
+| **Match** | What an arena plays from start to final standings. **Ranked:** a best-of-3 series of rounds between 2 players. **Unrated:** exactly 1 round. ELO is applied per ranked match. |
 | **Tile** | One cell of the 21×21 grid. |
 | **Hard wall** | An indestructible wall. |
 | **Soft wall** | A destructible wall that is placed randomly and can be destroyed by fire. |
@@ -72,7 +72,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 | **Alien** | A computer-controlled enemy (NPC). Touching one kills a player instantly. |
 | **Tick** | One step of the server simulation (60 Hz). |
 | **Guest** | An anonymous player with no account. |
-| **Game mode** | **Ranked** (standard rules locked, best-of-3, rated) or **Unrated** (custom rules allowed, never rated). Set per arena. |
+| **Game mode** | **Ranked** (1-vs-1, registered players only, standard rules locked, best-of-3, rated) or **Unrated** (2–4 players, guests welcome, custom rules allowed, single round, never rated). Set per arena. |
 | **Rated match** | A Ranked match that meets the eligibility rules and therefore changes ELO (§5.4.2). |
 | **ELO** | A skill rating system. Everyone starts at 1200, and each rated match moves rating points between players. |
 | **Game event** | A real-time fact that happened inside an arena (bomb exploded, wall destroyed…), sent to clients. |
@@ -86,12 +86,13 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 
 | Role | Can do |
 |---|---|
-| **Guest** | Choose a nickname (or have one generated), browse arenas, join/create arenas, play (including in ranked arenas, but **unrated**). Stats are **not** persisted. |
-| **Registered user** | Everything a guest can do, plus a persistent profile, match history, statistics, an **ELO rating**, a leaderboard position and a reserved username. |
+| **Guest** | Choose a nickname (or have one generated), browse all arenas, and join/create and play **Unrated** arenas. Guests see Ranked arenas in the list but **cannot join them** ("Register to play Ranked"). Stats are **not** persisted. |
+| **Registered user** | Everything a guest can do, plus **Ranked** play, a persistent profile, match history, statistics, an **ELO rating**, a leaderboard position and a reserved username. |
 
 ### 3.2 Registration
 
 - Fields: `username` (3–16 chars, `[A-Za-z0-9_]`, unique and case-insensitive), `email` (unique, valid format) and `password` (min. 8 chars).
+- The form asks for the password **twice** (`password` + `confirm password`). The client checks that both match before submitting, and the submit button stays disabled until they do. The API receives the password only once: the confirmation is a typo guard in the UI, not a server field.
 - Passwords are hashed with **argon2id** (or bcrypt with cost ≥ 12).
 - After a successful registration the user is logged in automatically, and a rating row (1200, provisional) is created.
 - *(v1.1)* Email verification and password reset by email.
@@ -110,7 +111,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 - "Play as guest" asks for an optional nickname. If none is given, one is generated (e.g. `Guest-4821`).
 - The server issues a **guest JWT** (`role: guest`, random `guestId`), valid for 24 h.
 - Guest nicknames get a visible marker in game (e.g. grey name or a "guest" tag) and cannot impersonate registered usernames.
-- Guests have no rating and are **ignored by ELO calculations** (§5.4.3).
+- Guests have no rating and **cannot join Ranked arenas** (§5.4.2). The server rejects `arena.join` for a guest with `ranked_requires_account`.
 
 ---
 
@@ -177,14 +178,16 @@ Legend: # hard wall   + soft wall (random)   . empty   1-4 spawn
 
 ### 4.3 Controls
 
-| Action | Keys |
-|---|---|
-| Move | Arrow keys **or** W A S D |
-| Place bomb | **SPACE** |
-| Open menu / leave arena | ESC |
+| Action | Keyboard | Touch (phones, tablets) |
+|---|---|---|
+| Move | Arrow keys **or** W A S D | **Virtual joystick**, bottom-left |
+| Place bomb | **SPACE** | **Bomb button**, bottom-right |
+| Open menu / leave arena | ESC | ☰ button, top corner |
 
 - If several direction keys are held at once, the most recently pressed one wins.
 - Holding a direction keeps moving the player tile by tile.
+- **Touch:** the joystick is a floating circle. It appears where the thumb lands in the left half of the screen, and the thumb's offset from that point picks the direction. Movement is tile-by-tile, so the offset is snapped to the nearest of the **4 directions**, with a dead zone in the middle (stop). Holding the thumb off-center works like holding a key. The touch layout is used when the device's primary pointer is coarse (`pointer: coarse`); keyboard hints are hidden then.
+- Touch input produces exactly the same commands as the keyboard (direction held, bomb pressed), so prediction and the server need no changes.
 
 ### 4.4 Movement & tile occupancy
 
@@ -274,26 +277,28 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 - **Type mix:** Drifter 50 %, Seeker 35 %, Brute 15 %.
 - All alien choices use the round's **seeded PRNG**, so a round replays identically from its seed plus the recorded inputs.
 
-### 4.8 Rounds & match lifecycle (best-of-3)
+### 4.8 Rounds & match lifecycle
 
 #### 4.8.1 States
 
 ```
-WAITING ─(≥2 players & all ready, or host starts)─► COUNTDOWN (3 s) ─► PLAYING
-   ▲                                                    ▲                 │ (≤1 alive or time over)
-   │                                                    │ match open      ▼
-   └──── MATCH_END (12 s) ◄── match decided ─────── ROUND_END (5 s) ──────┘
+WAITING ─(≥2 players, all ready)─► READY_COUNTDOWN (15 s) ─► COUNTDOWN (3 s) ─► PLAYING
+   ▲        ▲                          │ someone joins,                ▲               │ (≤1 alive or time over)
+   │        └──────────────────────────┘ un-readies or leaves          │ match open    ▼
+   │                                                                   │ (Ranked only)
+   └──── MATCH_END (12 s) ◄──────────── match decided ──────────── ROUND_END (5 s) ────┘
 ```
 
-- **WAITING:** between matches. Players can join, leave, ready up, and the host can change settings (Unrated only).
+- **WAITING:** between matches. Players can join, leave and ready up, and the host can change settings (Unrated only).
+- **READY_COUNTDOWN** (15 s): starts as soon as at least 2 players are in and **all** of them are Ready (§5.2). It is the last chance for more players to join, and it pauses whenever someone is not ready.
 - **COUNTDOWN → PLAYING → ROUND_END:** one round. A new random map is generated for every round.
-- **ROUND_END** (5 s): shows the round winner and the current score, then the next round's COUNTDOWN starts automatically.
+- **ROUND_END** (5 s): shows the round winner and the current score. In **Ranked**, the next round's COUNTDOWN starts automatically if the match is still open. In **Unrated**, the match is always decided after its single round.
 - **MATCH_END** (12 s): shows the final standings and rating changes, then the arena goes back to WAITING. Players stay unless they leave.
-- A full best-of-3 lasts at most about **10 min**: 3 × (3 s + 3 min + 5 s) + 12 s.
+- A ranked best-of-3 lasts at most about **10 min**: 3 × (3 s + 3 min + 5 s) + 12 s. An unrated match lasts at most about **3.5 min**.
 
 #### 4.8.2 A round
 
-- **Players per arena:** 2–4. Bigger arenas are out of scope for now.
+- **Players per arena:** **Ranked: exactly 2.** **Unrated: 2–4.** Bigger arenas are out of scope for now.
 - **Time limit:** 3 min.
 - **Sudden death** starts at **2:00**:
   - Hard walls start filling the arena in a spiral from the border inward, one tile every 0.5 s. That is 120 tiles by 3:00.
@@ -309,32 +314,29 @@ WAITING ─(≥2 players & all ready, or host starts)─► COUNTDOWN (3 s) ─�
   - Players eliminated on the same tick **share** a placement.
 - **Round points:** 1st place = **3**, 2nd = **2**, 3rd = **1**, 4th = **0**. Players who share a placement all get the points of that placement, so two players sharing 1st both get 3.
 
-#### 4.8.3 The match (best-of-3)
+#### 4.8.3 The match
 
-| Rule | Value |
-|---|---|
-| Format | **Ranked:** always best-of-3. **Unrated:** host picks Bo1 / **Bo3** (default) / Bo5. |
-| Win the match | Be the first to **2 round wins** (generally ⌈N/2⌉ for best-of-N) |
-| Maximum rounds | **3** (N). Drawn rounds count as played but give nobody a round win. |
-| Match ends when | Someone reaches 2 round wins, **or** 3 rounds have been played, **or** fewer than 2 players are still in the match |
+| Rule | Ranked (1-vs-1) | Unrated (2–4 players) |
+|---|---|---|
+| Format | **Best-of-3**, fixed | **Single round** (Bo1), fixed |
+| Win the match | Be the first to **2 round wins** | Win the round |
+| Maximum rounds | **3**. Drawn rounds count as played but give nobody a round win. | 1 |
+| Match ends when | Someone reaches 2 round wins, **or** 3 rounds have been played, **or** a player forfeits | After the round, **or** when fewer than 2 players are still in |
 
-**Match placement** (used for the final standings and for ELO). Players are sorted by:
+Why the split: with 3–4 players, a series of rounds can end with everyone holding one win, and then the winner is picked by tiebreaks nobody follows. One round is simple and readable. A duel has no such problem, and best-of-3 there removes the luck of a single round, which matters when rating is at stake.
+
+**Unrated placement** is simply the round placement (§4.8.2).
+
+**Ranked placement** (used for the final result and for ELO). The two players are compared by:
 
 1. **Round wins**, more is better.
 2. **Total round points**, more is better.
 3. **Placement in the last round played**, better is better.
-4. If still equal, the players **share** the match placement. If they share 1st place, the match is a **draw**.
+4. If still equal, the match is a **draw**.
 
-**Example:** 3 players where everyone wins one round.
+Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 after one drawn round.
 
-| Round | Order | Points A / B / C |
-|---|---|---|
-| 1 | A, B, C | 3 / 2 / 1 |
-| 2 | B, C, A | 1 / 3 / 2 |
-| 3 | C, A, B | 2 / 1 / 3 |
-| **Total** | 1 round win each | **6 / 6 / 6** |
-
-Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
+**Example:** A wins round 1, round 2 is a draw, B wins round 3. That is 1–1 in wins and 8–8 in points (A: 3 + 3 + 2, B: 2 + 3 + 3), so the last round decides it: **B wins the match**.
 
 #### 4.8.4 Joining, leaving and disconnecting
 
@@ -353,20 +355,33 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 
 ### 5.1 Lobby
 
-- Shows the list of arenas with: name, **Ranked/Unrated** badge, format (Bo3…), status (Waiting / **Round 2 of 3, score 1–0** / Match end), players `n/4`, **average rating** (ranked arenas), whether it is private, whether aliens are on, **region and measured ping**.
+- Shows the list of arenas with: name, **Ranked 1v1 / Unrated** badge, status (Waiting / Starting in 0:12 / **Round 2 of 3, score 1–0** / Playing / Match end), players (`n/2` ranked, `n/4` unrated), the **waiting opponent's rating** (ranked arenas), whether it is private, whether aliens are on, **region and measured ping**.
 - Actions:
-  - **Quick Play:** joins a **ranked** WAITING public arena in the **lowest-ping region**. Among those, it prefers arenas whose average rating is within ±200 of the player's rating, then the fullest arena. If none is available, it creates a new ranked arena. Guests are matched by fullness only.
+  - **Quick Play:**
+    - **Registered users** join a **ranked** WAITING arena with one player waiting, in the **lowest-ping region**, preferring an opponent within ±200 rating. If none is available, it creates a new ranked arena and waits there.
+    - **Guests** join an **unrated** WAITING public arena in the lowest-ping region, preferring the fullest one, or create one.
   - **Create Arena:**
-    - Name, region (lowest ping preselected), max players (2–4), private (yes/no).
+    - Name, region (lowest ping preselected), private (yes/no).
     - **Game mode:** **Ranked** or **Unrated**.
-    - Unrated only: format (Bo1/Bo3/Bo5), soft wall density, wall drop rate, aliens on/off, max aliens.
-    - Ranked uses the locked standard rules (§5.4.2).
-  - **Join**: by clicking an arena in the list, or by entering a **6-character invite code** for a private arena.
+    - **Ranked:** always 2 players, public and the locked standard rules (§5.4.2). Not offered to guests.
+    - **Unrated:** max players (2–4), soft wall density, wall drop rate, aliens on/off, max aliens. Always a single round.
+  - **Join**: by clicking an arena in the list, or by entering a **6-character invite code** for a private arena. Guests clicking a Ranked arena get a "Register to play Ranked" prompt.
 - The list refreshes live over the socket.
 
 ### 5.2 Arena rules
 
-- The creator is the **host** and can start the match early once at least 2 players are in, and can kick players. In ranked arenas a kick only takes effect between matches. If the host leaves, the host role passes to the player who joined next earliest.
+- The creator is the **host**. The host can change settings (Unrated) and kick players, but **cannot start the match by hand**. In ranked arenas a kick only takes effect between matches. If the host leaves, the host role passes to the player who joined next earliest.
+- **Starting a match: the 15 s ready countdown.**
+  - Every player in the waiting room has a **Ready** toggle.
+  - When at least **2 players** are in and **all** of them are Ready, a **15 s countdown** starts (READY_COUNTDOWN, §4.8.1), visible to everyone in the room and as "Starting in 0:12" in the lobby list.
+  - The arena stays open during the countdown, so a 3rd or 4th player can still join an unrated arena.
+  - **A new player joins** → the countdown **pauses**. The newcomer starts as *Not ready*. When they press Ready, the countdown **restarts from 15 s**.
+  - **A player un-readies** → the countdown pauses until they are Ready again, then restarts from 15 s.
+  - **A player leaves** → if at least 2 players remain and all are Ready, the countdown restarts from 15 s; otherwise it is cancelled.
+  - The host changing a setting un-readies everyone, so nobody starts a match with rules they did not see.
+  - When the countdown reaches 0, the roster is locked and the round's 3 s COUNTDOWN begins.
+  - **Ranked:** the same rule with 2 slots. Once both players are Ready, the 15 s countdown runs, and nobody else can join a full ranked arena.
+  - Restarting from 15 s every time could stall a room if people keep joining. This is accepted: the room is capped at 4 players, so at most 2 restarts can come from new joiners.
 - An arena with no players for 60 s is destroyed.
 - A player can be in **only one arena at a time**. Opening a second tab replaces the first connection.
 
@@ -387,7 +402,8 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 | High rating (≥ 1800) | K = **16** |
 | Leaderboard eligibility | ≥ **10** rated matches. Before that, the player shows as "Placement n/10". |
 | Storage | Integer rating. Deltas are rounded half away from zero. |
-| Unit | **One rating update per match** (the whole best-of-3), never per round |
+| Unit | **One rating update per ranked match** (the whole best-of-3), never per round |
+| Who is rated | Only **Ranked 1-vs-1** matches. Unrated matches, whatever the player count, never change rating. |
 | Seasons | **None in v1.** The rating is permanent, and there are no resets or decay. |
 
 #### 5.4.2 When is a match rated?
@@ -395,48 +411,34 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 A match is **rated** only if **all** of these hold:
 
 1. The arena is **public** and in **Ranked** mode. Private arenas can only be Unrated, which stops friends from boosting each other.
-2. The arena uses the **standard ruleset**, which is locked in Ranked mode: best-of-3, 65 % walls, 30 % wall drops, aliens on, max 4 aliens.
-3. At least **2 registered players** were on the roster when the first round's COUNTDOWN started.
-4. The match reached a result (§4.8.3). A match that ended early because opponents forfeited **is** rated, and the forfeiters lose.
+2. The arena uses the **standard ruleset**, which is locked in Ranked mode: 2 players, best-of-3, 65 % walls, 30 % wall drops, aliens on, max 4 aliens.
+3. **Both** players on the roster are registered. Guests cannot join Ranked arenas (§3.4), so this always holds; the rating worker still checks it.
+4. The match reached a result (§4.8.3). A match that ended early because the opponent forfeited **is** rated, and the forfeiter loses.
 5. The match finished normally. If a server crashes mid-match, the whole match, including rounds already played, is not rated (see [Events §9](./EVENTS-AND-MESSAGING.md#9-failure-scenarios)).
 
-**Guests** may join Ranked arenas and play normally, but they are never rated and are left out of every ELO pair.
+#### 5.4.3 Two-player ELO
 
-#### 5.4.3 Multiplayer ELO (pairwise method)
-
-A 2–4 player match is treated as **every pair of registered players playing one game against each other**, scored by their **match placement** (§4.8.3), not by individual rounds. Guests are left out of every pair.
-
-For registered players *i* and *j*:
+Standard ELO for player *A* against opponent *B*, scored by the **match** result (§4.8.3), not by individual rounds:
 
 ```
-E_ij  = 1 / (1 + 10^((R_j − R_i) / 400))          expected score of i vs j
-S_ij  = 1    if placement_i better than placement_j
-        0.5  if same placement (tie / draw / simultaneous death)
-        0    if worse
-Δ_i   = round( K_i / (N − 1) × Σ_j (S_ij − E_ij) )   N = number of rated players
-R_i'  = max(100, R_i + Δ_i)
+E_A  = 1 / (1 + 10^((R_B − R_A) / 400))     expected score of A
+S_A  = 1    A won the match
+       0.5  draw
+       0    A lost (including by forfeit)
+Δ_A  = round( K_A × (S_A − E_A) )
+R_A' = max(100, R_A + Δ_A)
 ```
 
-- **Placement** is the match placement: round wins, then round points, then the last round (§4.8.3).
 - **How a player died does not matter.** A death to a bomb, an alien or a wall all count the same. Kills and alien kills do **not** change the rating directly; they only appear in stats.
-- **Forfeiting** puts the player below everyone who stayed, so rage-quitting is never better than losing.
-- Each player uses their **own K**. The sum of all deltas is therefore not exactly zero, which is standard and accepted.
+- **Forfeiting** is a loss, so rage-quitting is never better than playing on.
+- Each player uses their **own K**. Two players with different K values do not move by the same amount, so the sum of both deltas is not always zero. This is standard and accepted.
 
-**Example** (K = 24, 4 rated players):
-
-| Player | Rating | Placement |
-|---|---|---|
-| A | 1200 | 1 |
-| B | 1200 | 2 |
-| C | 1300 | 3 |
-| D | 1100 | 4 |
-
-For A:
+**Example:** A (1200, K = 24) beats B (1300, K = 40, provisional).
 
 ```
-E_AB = 0.50, E_AC = 0.36, E_AD = 0.64  →  ΣE = 1.50
-ΣS = 3
-Δ_A = 24/3 × (3 − 1.50) = +12  →  1212
+E_A = 1 / (1 + 10^(100/400)) = 0.36      E_B = 0.64
+Δ_A = round(24 × (1 − 0.36)) = +15  →  1215
+Δ_B = round(40 × (0 − 0.64)) = −26  →  1274
 ```
 
 #### 5.4.4 Tiers (display only)
@@ -453,9 +455,9 @@ E_AB = 0.50, E_AC = 0.36, E_AD = 0.64  →  ΣE = 1.50
 
 - Ratings are calculated **asynchronously** by the **rating worker**, from the durable `match.finished` domain event (see [Events & Messaging](./EVENTS-AND-MESSAGING.md)).
 - Processing is idempotent, so a duplicate delivery never applies a rating change twice.
-- The game server publishes **one** `match.finished` event per best-of-3 match, containing all of its rounds.
+- The game server publishes **one** `match.finished` event per match (ranked best-of-3 or unrated single round), containing all of its rounds. The rating worker applies ELO only to rated ranked matches.
 - The match-end screen shows "rating updating…" and then the delta, pushed to the client within ~1–2 s.
-- *(v1.1)* Anti-farming: K is halved for a player's 6th+ match within 24 h against the exact same set of registered opponents.
+- *(v1.1)* Anti-farming: K is halved for a player's 6th+ match within 24 h against the same opponent.
 
 ---
 
@@ -676,10 +678,12 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 7. Aliens of all 3 types spawn away from players, move according to their behavior, **kill a player instantly on contact** (including tile swaps, regardless of HP or invulnerability), take damage from fire, respawn every 30 s up to the cap, and **always** drop collectibles when killed (Brute: 2).
 8. A bomb hit removes 1 HP followed by 1.5 s of fire invulnerability, and 0 HP eliminates the player.
 9. The last player alive wins the round. Sudden death starts at 2:00. At the 3:00 time-out, the survivor with the most HP wins, and a tie on the highest HP is a draw. Simultaneous final deaths produce a drawn round. Round placement follows HP for survivors, then elimination order.
-10. A match is best-of-3: the first player to 2 round wins takes it, with at most 3 rounds. Every round has a new map and reset power-ups. Ties are broken by round points, then the last round. Forfeiting players are ranked last.
+10. A ranked match is a 1-vs-1 best-of-3: the first player to 2 round wins takes it, with at most 3 rounds. Every round has a new map and reset power-ups. Ties are broken by round points, then the last round. A forfeit is a loss. An unrated match (2–4 players) is a single round, and its placement is the round placement.
+    - A match starts only through the waiting room's 15 s all-ready countdown. A player joining during it pauses it, and it restarts from 15 s when they are Ready. Guests cannot join Ranked arenas.
+    - On a touch device, a virtual joystick (4 directions) and a bomb button control the player, with the same result as the keyboard.
 11. Several arenas run at the same time without interfering with each other.
 12. With 100 ms of simulated RTT, your own movement and bomb placement still appear instantly, and remote players move smoothly without jitter.
-13. After a rated best-of-3 match, every registered player's rating changes **once** according to §5.4. The delta appears on the match-end screen within 3 s, and on the profile and leaderboard. Unrated matches, private arenas and guests are never rated. There are no seasons or resets.
+13. After a rated ranked match, both players' ratings change **once** according to §5.4. The delta appears on the match-end screen within 3 s, and on the profile and leaderboard. Unrated matches and private arenas are never rated. There are no seasons or resets.
 14. If the same `match.finished` event is delivered twice, the rating changes only once. If the database is down at match end, the rating is applied after it recovers.
 15. Registered users' matches (with per-round detail) show up in their profile. Guests' results do not.
 16. The app is deployed to the v1 VM by GitHub Actions from `main`, after a manual approval.
@@ -690,16 +694,16 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 | # | Milestone | Content |
 |---|---|---|
-| M1 | **Core simulation** | `internal/game`: map gen, movement, bombs, fire, collectibles (incl. +Bomb), round result & placement, **best-of-N match logic** (round points, tiebreaks, forfeits), determinism tests |
+| M1 | **Core simulation** | `internal/game`: map gen, movement, bombs, fire, collectibles (incl. +Bomb), round result & placement, **match logic** (ranked best-of-3 with round points, tiebreaks and forfeits; unrated single round), determinism tests |
 | M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, tests |
 | M3 | **Netcode** | Binary protocol + codecs (Go/TS) with shared test vectors, event sequencing and replay, WS gateway, arena tick loop, prediction and interpolation, latency simulator |
-| M4 | **GUI** | Vue app shell, canvas renderer, HUD, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
+| M4 | **GUI** | Vue app shell, canvas renderer, HUD, touch controls, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
 | M5 | **Accounts & data** | Register/login/guest (Gin), JWT/refresh, PostgreSQL schema & Goose migrations, gRPC services (buf) + Envoy gRPC-Web for profiles & stats |
 | M6 | **Events & ranking** | Pub/Sub topics + DLQs, match publisher with local spool, rating worker (pull, inbox, ELO), `LISTEN/NOTIFY` push, leaderboard, outbox table (relay enabled in v1.1) |
 | M7 | **v1 deployment** | GitHub Actions CI/CD, Artifact Registry, the VM + Docker Compose stack (Caddy, Envoy, Postgres), backups, OpenTelemetry + Prometheus/Grafana + Sentry, alerts |
 | M8 | **Polish** | Sprites, animations, sound, sudden death, settings, accessibility |
 | v2 | **Scale & latency** | GKE + Helm, Cloud SQL, multi-region game pods, Redis directory, WebTransport datagrams |
-| v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, touch controls, anti-farming |
+| v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, anti-farming, ranked matchmaking queue |
 | Later | Not in v1 | Rating seasons / resets, co-op / PvE modes |
 
 ---
@@ -710,12 +714,15 @@ Defaults are proposed above. Please confirm or change them:
 
 **Resolved:**
 
-- Match format is **best-of-3**.
+- Match format: **Ranked is 1-vs-1 best-of-3**, **Unrated is a single round** (v0.8).
 - There are **no seasons** in v1.
-- There are two game modes: **Ranked** and **Unrated**. Guests may join Ranked arenas but are never rated.
+- There are two game modes: **Ranked** and **Unrated**. Only registered players can play Ranked (v0.8).
+- Ranked opponents are found through ranked arenas in the lobby (and Quick Play), not a matchmaking queue (v0.8).
+- Matches start with a 15 s all-ready countdown; there is no host Start button (v0.8).
+- Touch controls are in v1: a virtual joystick and a bomb button (v0.8).
 
 - Players start with **3 HP**, up to 5 with +Health.
-- **2–4 players** per arena. No bigger arenas for now.
+- **2–4 players** per unrated arena, exactly 2 in ranked. No bigger arenas for now.
 - **Sudden death** stays. At the 3:00 time-out **the player with less HP loses**.
 - Movement is **tile-by-tile**.
 - **EU regions only** (§8.1).

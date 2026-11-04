@@ -91,7 +91,7 @@ Resulting perceived latency:
   internal/notify       Postgres LISTEN rating_updated → push to connected players
   internal/game         Deterministic simulation: map, movement, bombs, fire, items, rules
   internal/game/ai      Alien behaviors (wander, BFS hunt, danger map)
-  internal/game/match   Best-of-N logic: round points, tiebreaks, forfeits, match placement
+  internal/game/match   Match logic: ranked best-of-3 (round points, tiebreaks, forfeits), unrated single round, match placement
   internal/arena        Arena actor: tick loop, input buffers, broadcasting, lifecycle
   internal/lobby        Arena registry, quick play, invite codes, directory sync
   internal/proto        Binary codec + message types
@@ -142,7 +142,8 @@ The simulation is **pure and deterministic**: `State + []Command → State' + []
   - The golden vectors for the binary codec (§5.5) work the same way.
 - **Rounds vs. matches:**
   - `internal/game` simulates **one round** (a pure state machine).
-  - A small `internal/game/match` package holds the best-of-N logic: round points, round wins, tiebreaks, forfeits and match placement. It is pure and fully unit-tested.
+  - A small `internal/game/match` package holds the match logic: best-of-3 for ranked (round points, round wins, tiebreaks, forfeits), a single round for unrated, and match placement. It is pure and fully unit-tested.
+  - The arena actor also owns the waiting room's 15 s **ready countdown** (SPEC §5.2). It is counted in ticks like everything else, so pausing and restarting it is deterministic.
   - The arena actor drives the sequence ROUND → ROUND_END → … → MATCH_END.
 - **Replays:** seed + config + the ordered command log reproduce a round exactly. Logs can be uploaded to GCS for debugging (`match_rounds.input_log_uri`).
 
@@ -369,8 +370,8 @@ u8 nAliens
 
 | Direction | Types |
 |---|---|
-| C→S | `auth`, `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready`, `arena.start`, `arena.kick`, `resync` |
-| S→C | `auth.ok`, `lobby.list`, `lobby.update`, `arena.state`, `arena.countdown` (`{roundNo, bestOf, score}`), **`round.end`** (`{roundNo, winnerSlot\|null, draw, reason: "last_standing"\|"timeout_hp"\|"simultaneous", survivorsHp, placements, points, score:[{slot, roundWins, roundPoints}], matchDecided}`), `match.end` (`{matchId, mode, bestOf, winnerSlot\|null, draw, placements, rounds, stats, ratingPending}`), **`rating.updated`** (`{matchId, before, after, delta, tier, rank?}`), `server.draining`, `error` (`{code, message}`) |
+| C→S | `auth`, `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready` (`{ready: bool}`), `arena.kick`, `resync`. There is no `arena.start`: a match starts only through the all-ready countdown (SPEC §5.2). |
+| S→C | `auth.ok`, `lobby.list`, `lobby.update`, `arena.state`, **`arena.ready_countdown`** (`{endsAtTick\|null, paused: bool, reason?: "player_joined"\|"not_ready"\|"player_left"}`, sent whenever the 15 s waiting-room countdown starts, pauses, restarts or is cancelled), `arena.countdown` (`{roundNo, bestOf, score}`), **`round.end`** (`{roundNo, winnerSlot\|null, draw, reason: "last_standing"\|"timeout_hp"\|"simultaneous", survivorsHp, placements, points, score:[{slot, roundWins, roundPoints}], matchDecided}`), `match.end` (`{matchId, mode, bestOf, winnerSlot\|null, draw, placements, rounds, stats, ratingPending}`), **`rating.updated`** (`{matchId, before, after, delta, tier, rank?}`), `server.draining`, `error` (`{code, message}`, e.g. `ranked_requires_account` when a guest tries to join a Ranked arena) |
 
 ### 5.4 Bandwidth estimate (4 players, 8 aliens)
 
