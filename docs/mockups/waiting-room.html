@@ -9,81 +9,141 @@
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="mockups.css">
 </head>
-<body data-states="private|Private arena (invite code);not-host|As a non-host player">
-<i id="private" class="anchor"></i><i id="not-host" class="anchor"></i>
+<body data-states="countdown|All ready: starting in 12;paused|Countdown paused (Kate joined);ranked|Ranked 1v1 (2 slots);private|Private arena (invite code);not-host|As a non-host player">
+<i id="countdown" class="anchor"></i><i id="paused" class="anchor"></i><i id="ranked" class="anchor"></i><i id="private" class="anchor"></i><i id="not-host" class="anchor"></i>
 
 <header class="topbar room-bar">
   <a class="btn btn-ghost btn-sm" href="lobby.html"><svg class="i"><use href="#i-arrow-left"/></svg> Leave</a>
   <div class="title">
-    <b class="only-public">Friday Blast</b>
-    <b class="only-private">Kate's birthday</b>
-    <span class="badge badge-ranked only-public"><svg class="i"><use href="#i-star"/></svg> Ranked</span>
-    <span class="badge badge-unrated only-private"><svg class="i"><use href="#i-lock"/></svg> Private</span>
+    <b class="on-public">noobs only</b>
+    <b class="on-private">Kate's birthday</b>
+    <b class="on-ranked">duel night</b>
+    <span class="badge badge-unrated on-public" title="2–4 players · one round · never rated">Unrated</span>
+    <span class="badge badge-unrated on-private"><svg class="i"><use href="#i-lock"/></svg> Private</span>
+    <span class="badge badge-ranked on-ranked" title="1-vs-1 · best of 3 · standard rules · rated"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
   </div>
   <div class="spacer"></div>
-  <span class="code-pill only-private"><span class="lbl">Code</span> <b>K7M2QX</b>
+  <span class="code-pill on-private"><span class="lbl">Code</span> <b>K7M2QX</b>
     <a class="icon-btn" href="#private" aria-label="Copy code" style="width:30px;height:30px"><svg class="i"><use href="#i-copy"/></svg></a>
     <a class="icon-btn" href="#private" aria-label="Copy invite link" style="width:30px;height:30px"><svg class="i"><use href="#i-link"/></svg></a>
   </span>
-  <a class="btn btn-sm only-public" href="#"><svg class="i"><use href="#i-link"/></svg> <span class="lbl">Copy link</span></a>
+  <a class="btn btn-sm no-private" href="#"><svg class="i"><use href="#i-link"/></svg> <span class="lbl">Copy link</span></a>
   <span class="ping num"><span class="txt">EU ·</span> 24 ms</span>
 </header>
 
 <main class="page">
   <div class="room">
     <div class="stack">
-      <section class="slot-grid" aria-label="Players">
+      <!-- Unrated: up to 4 slots -->
+      <section class="slot-grid not-ranked" aria-label="Players">
         <div class="slot me" style="--pc:var(--p1)">
           <span class="avatar">A</span>
           <span class="nm">Andrew</span>
           <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span><span class="tier tier-gold num" style="font-size:13px">1342</span></span>
           <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
         </div>
-        <div class="slot" style="--pc:var(--p2)">
+        <div class="slot me-nonhost" style="--pc:var(--p2)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove Guest-4821" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
           <span class="avatar">G</span>
           <span class="nm">Guest-4821</span>
           <span class="tags"><span class="badge badge-guest">Guest</span></span>
           <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
         </div>
-        <div class="slot" style="--pc:var(--p3)">
-          <span class="avatar">K</span>
-          <span class="nm">Kate</span>
-          <span class="tags"><span class="tier tier-silver num" style="font-size:13px">1290</span></span>
-          <span class="state not"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        <div class="slot" style="--pc:var(--p4)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove mira" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
+          <span class="avatar">M</span>
+          <span class="nm">mira</span>
+          <span class="tags"><span class="tier tier-silver num" style="font-size:13px">1215</span></span>
+          <span class="state not on-idle"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+          <span class="state ready no-idle"><svg class="i"><use href="#i-check"/></svg> Ready</span>
         </div>
-        <div class="slot empty" style="--pc:var(--p4)">
+        <div class="slot empty no-paused" style="--pc:#2b3247">
           <span class="avatar"><svg class="i"><use href="#i-plus"/></svg></span>
           <span class="nm dim">Open slot</span>
           <span class="tags"></span>
           <span class="state not">Waiting<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
         </div>
+        <div class="slot newcomer on-paused" style="--pc:var(--p3)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove Kate" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
+          <span class="avatar">K</span>
+          <span class="nm">Kate</span>
+          <span class="tags"><span class="badge badge-live">New</span><span class="tier tier-silver num" style="font-size:13px">1290</span></span>
+          <span class="state not"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+      </section>
+
+      <!-- Ranked 1v1: 2 slots with rating and tier -->
+      <section class="slot-grid duo on-ranked" aria-label="Players">
+        <div class="slot me" style="--pc:var(--p1)">
+          <span class="avatar">A</span>
+          <span class="nm">Andrew</span>
+          <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span></span>
+          <span class="tier tier-gold">Gold · <span class="num">1342</span></span>
+          <span class="dim num" style="font-size:12px">#87 · 30 rated matches</span>
+          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
+        <span class="vs" aria-hidden="true">VS</span>
+        <div class="slot" style="--pc:var(--p3)">
+          <span class="avatar">K</span>
+          <span class="nm">Kate</span>
+          <span class="tags"></span>
+          <span class="tier tier-silver">Silver · <span class="num">1290</span></span>
+          <span class="dim num" style="font-size:12px">#142 · 61 rated matches</span>
+          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
       </section>
 
       <section class="panel panel-pad stack">
-        <div class="rules only-public">
-          <span class="chip hot"><svg class="i"><use href="#i-star"/></svg> Ranked</span>
+        <div class="rules on-public">
+          <span class="chip">Unrated</span>
+          <span class="chip">1 round</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
+          <a class="btn btn-sm btn-ghost host-only" href="#"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
+        </div>
+        <div class="rules on-private">
+          <span class="chip">Unrated</span>
+          <span class="chip">1 round</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 6</span>
+          <a class="btn btn-sm btn-ghost host-only" href="#private"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
+        </div>
+        <div class="rules on-ranked">
+          <span class="chip hot"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
           <span class="chip">Best of 3</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
           <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
         </div>
-        <div class="rules only-private">
-          <span class="chip">Unrated</span>
-          <span class="chip">Best of 5</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
-          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 6</span>
+        <p class="hint on-public">One round, last player standing wins. Unrated arenas are never rated, and guests are welcome. <span class="host-only">Changing a rule un-readies everyone.</span></p>
+        <p class="hint on-private">Private arenas are never rated. Share the code or the link to invite friends. <span class="host-only">Changing a rule un-readies everyone.</span></p>
+        <p class="hint on-ranked">Standard rules, locked. First to 2 round wins takes the match, and both players are rated afterwards.</p>
+        <p class="hint on-nonhost">Only the host (Andrew) can change the rules or remove players.</p>
+
+        <!-- 15 s ready countdown: no Start button, the match starts on its own -->
+        <div class="ready-box on-idle" aria-live="polite">
+          <span class="ring grey" style="--p:67"><b class="num" style="font-size:20px">2/3</b></span>
+          <span class="txt"><b>2 of 3 ready</b><span>The match starts 15 s after everyone is ready. Waiting for mira.</span></span>
         </div>
-        <p class="hint only-public">Standard rules. Registered players are rated after the match; guests play unrated.</p>
-        <p class="hint only-private">Private arenas are never rated. Share the code or the link to invite friends.</p>
-        <div class="room-actions">
-          <a class="btn btn-lg btn-ok" href="#"><svg class="i"><use href="#i-check"/></svg> Ready</a>
-          <a class="btn btn-lg btn-primary host-only" href="game.html#countdown"><svg class="i"><use href="#i-play"/></svg> Start match</a>
-          <span class="nonhost-only muted" style="align-items:center;gap:8px"><svg class="i"><use href="#i-clock"/></svg> Waiting for Andrew to start<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
+        <div class="ready-box on-countdown" aria-live="polite">
+          <span class="ring run" style="--p:80"><b>12</b></span>
+          <span class="txt"><span class="display">Starting in 12</span><span>Everyone is ready. Players can still join until 0; un-ready to pause.</span></span>
         </div>
-        <p class="hint host-only" style="text-align:center">2 of 3 players ready · the host can start with 2 or more players</p>
+        <div class="ready-box on-paused" aria-live="polite">
+          <span class="ring grey" style="--p:100"><svg class="i"><use href="#i-pause"/></svg></span>
+          <span class="txt"><b>Paused: Kate joined</b><span>3 of 4 ready. The countdown restarts from 15 s when Kate is ready.</span></span>
+        </div>
+        <div class="ready-box on-ranked" aria-live="polite">
+          <span class="ring run" style="--p:60"><b>9</b></span>
+          <span class="txt"><span class="display">Starting in 9</span><span>Both players are ready. The arena is full; un-ready to pause.</span></span>
+        </div>
+
+        <div class="room-actions" style="padding:6px 0 0">
+          <a class="btn btn-lg btn-ok" href="#" aria-pressed="true"><svg class="i"><use href="#i-check"/></svg> Ready</a>
+        </div>
+        <p class="hint" style="text-align:center">You're ready. Press again to un-ready.</p>
       </section>
     </div>
 
     <aside class="stack">
       <section class="panel">
-        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px">21 × 21 · new map every round</span></div>
+        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px"><span class="not-ranked">21 × 21 · one round</span><span class="on-ranked">21 × 21 · new map every round</span></span></div>
         <div style="padding:14px"><div class="map-preview arena-host"><canvas id="preview" aria-hidden="true"></canvas><div class="veil">Revealed at the countdown</div></div></div>
       </section>
       <section class="panel panel-pad">
@@ -93,6 +153,7 @@
           <span class="k"><span class="kbd">Space</span></span><span class="muted">Drop a bomb</span>
           <span class="k"><span class="kbd">Esc</span></span><span class="muted">Menu</span>
         </div>
+        <p class="hint" style="margin-top:12px">On phones and tablets: a joystick and a bomb button instead (<a href="game.html#touch">preview</a>).</p>
       </section>
     </aside>
   </div>

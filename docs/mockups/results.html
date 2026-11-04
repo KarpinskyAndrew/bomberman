@@ -9,88 +9,135 @@
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="mockups.css">
 </head>
-<body data-states="pending|Rating updating…;unrated|Unrated match;draw|Draw">
+<body data-states="pending|Ranked: rating updating…;draw|Ranked: draw;unrated|Unrated (one round, 4 players)">
 <i id="pending" class="anchor"></i><i id="unrated" class="anchor"></i><i id="draw" class="anchor"></i>
 
+<!-- Default / #pending / #draw: ranked 1v1, best of 3. #unrated: a single round for 2–4 players. -->
 <div class="results-wrap">
   <div class="arena-host"><canvas id="frozen" aria-hidden="true"></canvas></div>
 
   <section class="results-card" aria-labelledby="res-t">
     <div class="results-head">
       <h1 id="res-t">MATCH OVER</h1>
-      <span class="badge badge-ranked mode-ranked"><svg class="i"><use href="#i-star"/></svg> Ranked</span>
+      <span class="badge badge-ranked mode-ranked"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
+      <span class="chip mode-ranked">Best of 3</span>
+      <span class="chip mode-ranked">duel night</span>
       <span class="badge badge-unrated mode-unrated">Unrated</span>
-      <span class="chip">Best of 3</span>
-      <span class="chip">Friday Blast</span>
+      <span class="chip mode-unrated">1 round</span>
+      <span class="chip mode-unrated">noobs only</span>
     </div>
 
-    <div class="winner win-only">
-      <span class="cup"><svg class="i"><use href="#i-trophy"/></svg></span>
-      <div><h2>Andrew wins the match 2–1!</h2><p>Took rounds 1 and 3 · 3 kills · 5 aliens</p></div>
-    </div>
-    <div class="winner draw-only">
-      <span class="cup" style="color:var(--muted);background:rgba(255,255,255,.06)"><svg class="i"><use href="#i-flag"/></svg></span>
-      <div><h2>It's a draw!</h2><p>Andrew and Guest-4821 are tied on round wins and points. The last round was a draw too.</p></div>
-    </div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead><tr><th>#</th><th>Player</th><th class="c">R1</th><th class="c">R2</th><th class="c">R3</th><th class="r">Wins</th><th class="r">Pts</th><th class="r">Kills</th><th class="r">Aliens</th><th class="col-rating">Rating</th></tr></thead>
-        <tbody class="num">
-          <tr class="me">
-            <td><span class="place place-1">1</span></td>
-            <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p1)"></span><b>Andrew</b></span></td>
-            <td class="c"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span></td><td class="c">2</td><td class="c"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span></td>
-            <td class="r"><b>2</b></td><td class="r">8</td><td class="r">3</td><td class="r">5</td>
-            <td class="col-rating">
-              <span class="rating-cell final-only">1342 → <b>1356</b> <span class="delta up">▲14</span></span>
-              <span class="rating-cell pending-only"><span class="shimmer"></span> <span class="dim">updating…</span></span>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="place">2</span></td>
-            <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p2)"></span><b>Guest-4821</b> <span class="badge badge-guest">Guest</span></span></td>
-            <td class="c">2</td><td class="c"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span></td><td class="c">3</td>
-            <td class="r">1</td><td class="r">6</td><td class="r">1</td><td class="r">2</td>
-            <td class="col-rating dim">unrated</td>
-          </tr>
-          <tr>
-            <td><span class="place">3</span></td>
-            <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p3)"></span><b>Kate</b></span></td>
-            <td class="c">3</td><td class="c">3</td><td class="c">2</td>
-            <td class="r">0</td><td class="r">4</td><td class="r">0</td><td class="r">1</td>
-            <td class="col-rating">
-              <span class="rating-cell final-only">1290 → <b>1276</b> <span class="delta down">▼14</span></span>
-              <span class="rating-cell pending-only"><span class="shimmer"></span> <span class="dim">updating…</span></span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <details class="round-details">
-      <summary><svg class="i"><use href="#i-chevron-down"/></svg> Round details</summary>
-      <div class="rounds">
-        <div class="round-box">
-          <h4>ROUND 1 · 2:14</h4>
-          <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Andrew</b> wins with 2 ♥ left</span>
-          <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Kate · bomb by Andrew</span>
-          <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Guest-4821 · eaten by a Seeker</span>
-        </div>
-        <div class="round-box">
-          <h4>ROUND 2 · 3:00</h4>
-          <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Guest-4821</b> wins on health (3 ♥ vs 2 ♥)</span>
-          <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Kate · eaten by a Brute</span>
-          <span class="ln"><svg class="i"><use href="#i-clock"/></svg> Ended by sudden death</span>
-        </div>
-        <div class="round-box">
-          <h4>ROUND 3 · 1:51</h4>
-          <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Andrew</b> wins with 1 ♥ left</span>
-          <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Guest-4821 · bomb by Andrew</span>
-          <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Kate · own bomb</span>
-        </div>
+    <!-- ===== Ranked ===== -->
+    <div class="mode-ranked">
+      <div class="winner win-only">
+        <span class="cup"><svg class="i"><use href="#i-trophy"/></svg></span>
+        <div><h2>Andrew wins the match 2–1!</h2><p>Took rounds 1 and 3 · 3 kills · 5 aliens</p></div>
       </div>
-    </details>
+      <div class="winner draw-only">
+        <span class="cup" style="color:var(--muted);background:rgba(255,255,255,.06)"><svg class="i"><use href="#i-flag"/></svg></span>
+        <div><h2>It's a draw!</h2><p>Andrew and Kate are tied 1–1 on rounds and 8–8 on points, and round 3 was a draw too.</p></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>#</th><th>Player</th><th class="c">R1</th><th class="c">R2</th><th class="c">R3</th><th class="r">Wins</th><th class="r">Pts</th><th class="r">Kills</th><th class="r">Aliens</th><th>Rating</th></tr></thead>
+          <tbody class="num">
+            <tr class="me">
+              <td><span class="place place-1">1</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p1)"></span><b>Andrew</b></span></td>
+              <td class="c"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span></td><td class="c">2</td>
+              <td class="c"><span class="rw win-only"><svg class="i"><use href="#i-trophy"/></svg></span><span class="dim draw-only">draw</span></td>
+              <td class="r"><b class="win-only">2</b><span class="draw-only">1</span></td>
+              <td class="r"><span class="win-only">8</span><span class="draw-only">8</span></td><td class="r">3</td><td class="r">5</td>
+              <td>
+                <span class="rating-cell final-only win-only">1342 → <b>1352</b> <span class="delta up">▲10</span></span>
+                <span class="rating-cell final-only draw-only">1342 → <b>1340</b> <span class="delta down">▼2</span></span>
+                <span class="rating-cell pending-only"><span class="shimmer"></span> <span class="dim">updating…</span></span>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="place win-only">2</span><span class="place place-1 draw-only">1</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p3)"></span><b>Kate</b></span></td>
+              <td class="c">2</td><td class="c"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span></td>
+              <td class="c"><span class="win-only">2</span><span class="dim draw-only">draw</span></td>
+              <td class="r">1</td>
+              <td class="r"><span class="win-only">7</span><span class="draw-only">8</span></td><td class="r">1</td><td class="r">2</td>
+              <td>
+                <span class="rating-cell final-only win-only">1290 → <b>1280</b> <span class="delta down">▼10</span></span>
+                <span class="rating-cell final-only draw-only">1290 → <b>1292</b> <span class="delta up">▲2</span></span>
+                <span class="rating-cell pending-only"><span class="shimmer"></span> <span class="dim">updating…</span></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="round-details">
+        <summary><svg class="i"><use href="#i-chevron-down"/></svg> Round details</summary>
+        <div class="rounds">
+          <div class="round-box">
+            <h4>ROUND 1 · 2:14</h4>
+            <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Andrew</b> wins with 2 ♥ left</span>
+            <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Kate · bomb by Andrew</span>
+          </div>
+          <div class="round-box">
+            <h4>ROUND 2 · 1:58</h4>
+            <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Kate</b> wins with 2 ♥ left</span>
+            <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Andrew · bomb by Kate</span>
+          </div>
+          <div class="round-box win-only">
+            <h4>ROUND 3 · 3:00</h4>
+            <span class="ln"><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> <b>Andrew</b> wins on health (2 ♥ vs 1 ♥)</span>
+            <span class="ln"><svg class="i"><use href="#i-clock"/></svg> Ended by sudden death</span>
+          </div>
+          <div class="round-box draw-only">
+            <h4>ROUND 3 · 2:41</h4>
+            <span class="ln"><svg class="i"><use href="#i-flag"/></svg> <b>Draw</b> · both caught in the same blast</span>
+            <span class="ln"><svg class="i"><use href="#i-skull"/></svg> Andrew and Kate · same tick</span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- ===== Unrated: one round, no round, points or rating columns ===== -->
+    <div class="mode-unrated">
+      <div class="winner">
+        <span class="cup"><svg class="i"><use href="#i-trophy"/></svg></span>
+        <div><h2>Guest-4821 wins!</h2><p>Last one standing with 2 ♥ · 1 kill · 1 alien</p></div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>#</th><th>Player</th><th>Result</th><th class="r">Kills</th><th class="r">Aliens</th></tr></thead>
+          <tbody class="num">
+            <tr>
+              <td><span class="place place-1">1</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p2)"></span><b>Guest-4821</b> <span class="badge badge-guest">Guest</span></span></td>
+              <td><span class="row" style="gap:6px"><span class="rw"><svg class="i"><use href="#i-trophy"/></svg></span> survived with 2 ♥</span></td>
+              <td class="r">1</td><td class="r">1</td>
+            </tr>
+            <tr>
+              <td><span class="place">2</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p4)"></span><b>mira</b></span></td>
+              <td class="muted">blown up by Guest-4821</td>
+              <td class="r">0</td><td class="r">2</td>
+            </tr>
+            <tr class="me">
+              <td><span class="place">3</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p1)"></span><b>Andrew</b></span></td>
+              <td class="muted">eaten by a Brute</td>
+              <td class="r">0</td><td class="r">1</td>
+            </tr>
+            <tr>
+              <td><span class="place">4</span></td>
+              <td><span class="row" style="gap:8px"><span class="swatch" style="--pc:var(--p3)"></span><b>Kate</b></span></td>
+              <td class="muted">eaten by a Brute</td>
+              <td class="r">0</td><td class="r">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint" style="padding:12px 22px 0">Unrated matches never change ratings. Registered players still get the match in their history.</p>
+    </div>
 
     <div class="results-foot">
       <div class="back"><span>Back to the waiting room in <b class="num" style="color:var(--ink)">9 s</b></span><div class="bar"><i></i></div></div>

@@ -28,7 +28,7 @@
 
 <main class="page">
   <h1 class="page-title">Leaderboard</h1>
-  <p class="muted" style="margin-top:6px">Registered players with at least 10 rated matches. No seasons, no resets.</p>
+  <p class="muted" style="margin-top:6px">Ranked 1v1 ratings of registered players with at least 10 rated matches. Matches and win % count ranked duels only. No seasons, no resets.</p>
 
   <section class="podium" id="podium" aria-label="Top 3"></section>
 
@@ -67,7 +67,7 @@
   document.getElementById('rows').innerHTML =
     players.map(row).join('') +
     '<tr class="pinned-sep"><td colspan="6">· · ·</td></tr>' +
-    row({ rank: 87, name: 'Andrew', rating: 1342, matches: 42, win: 31, me: true });
+    row({ rank: 87, name: 'Andrew', rating: 1342, matches: 30, win: 47, me: true });
   document.getElementById('podium').innerHTML = players.slice(0, 3).map(p => `
     <a class="pod r${p.rank}" href="profile.html">
       <span class="rank">${p.rank}</span>

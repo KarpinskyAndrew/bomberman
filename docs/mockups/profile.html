@@ -37,20 +37,20 @@
           <span class="tier tier-gold rated-only">Gold</span>
           <span class="placement-only badge badge-unrated">Placement</span>
           <span>Member since Oct 2026</span>
-          <span class="num">42 matches</span>
+          <span class="num">42 matches · 30 ranked</span>
         </div>
       </div>
       <div class="rating-block">
-        <div class="rated-only"><span class="v">1342</span><small>Rating · peak <span class="num">1388</span></small></div>
+        <div class="rated-only"><span class="v">1342</span><small>Rating · peak <span class="num">1375</span></small></div>
         <div class="rated-only"><span class="v rk">#87</span><small>Global rank</small></div>
         <div class="placement-only"><span class="v">4/10</span><small>Placement matches · rank shown after 10</small></div>
       </div>
     </div>
     <div class="stat-grid">
       <div class="stat"><div class="v">42</div><div class="l">Matches</div></div>
-      <div class="stat"><div class="v">13</div><div class="l">Wins</div></div>
-      <div class="stat"><div class="v">31 %</div><div class="l">Win rate</div></div>
-      <div class="stat"><div class="v">37</div><div class="l">Rounds won</div></div>
+      <div class="stat"><div class="v">17</div><div class="l">Wins</div></div>
+      <div class="stat"><div class="v">40 %</div><div class="l">Win rate</div></div>
+      <div class="stat"><div class="v">14–15</div><div class="l">Ranked W–L (1 draw)</div></div>
       <div class="stat"><div class="v">88</div><div class="l">Kills</div></div>
       <div class="stat"><div class="v">140</div><div class="l">Alien kills</div></div>
       <div class="stat"><div class="v">17</div><div class="l">Deaths by alien</div></div>
@@ -60,7 +60,7 @@
 
   <div class="profile-grid">
     <section class="panel">
-      <div class="panel-head"><h2>Rating history</h2><span class="dim" style="font-size:12px">Last 42 rated matches</span></div>
+      <div class="panel-head"><h2>Rating history</h2><span class="dim" style="font-size:12px">Last 30 rated matches · Ranked 1v1 only</span></div>
       <div class="chart" id="chart"></div>
     </section>
 
@@ -68,7 +68,7 @@
       <div class="panel-head"><h2>Match history</h2>
         <div class="seg"><input type="radio" name="hf" id="hf-a" checked><label for="hf-a">All</label><input type="radio" name="hf" id="hf-r"><label for="hf-r">Ranked</label><input type="radio" name="hf" id="hf-u"><label for="hf-u">Unrated</label></div>
       </div>
-      <div class="history-head"><span>When</span><span>Mode</span><span>Place</span><span>Players</span><span>Rounds</span><span>Rating</span><span></span></div>
+      <div class="history-head"><span>When</span><span>Mode</span><span>Result</span><span>Opponents</span><span>Score</span><span>Rating</span><span></span></div>
       <div id="history"></div>
       <div class="pager"><a class="btn btn-sm" aria-disabled="true" href="#">‹ Prev</a><span class="num">Page 1 / 5</span><a class="btn btn-sm" href="#">Next ›</a></div>
     </section>
@@ -80,8 +80,9 @@
 <script>
   // Rating history chart (inline SVG, tier bands in the background)
   (function () {
-    // 42 rated matches ending at the current rating 1342, peaking at 1388.
-    const deltas = [8, 15, -14, 11, 9, -6, 13, -10, 12, 8, -9, 14, 7, -11, 12, 10, -7, 9, -13, 11, 14, -8, 6, 12, -10, 9, 15, -12, 8, -6, 10, -14, 13, 11, 20, 17, 14, -20, -17, -14, -9, 14];
+    // 30 rated (ranked 1v1) matches ending at the current rating 1342, peaking at 1375.
+    // The last five are the ranked rows of the match history below (oldest first): +2 draw, +16, -11, -6, +10.
+    const deltas = [12, 15, -14, 11, 9, -6, 13, -10, 12, 8, -9, 14, 7, -11, 12, 10, -7, 9, -13, 11, 22, 19, 17, -24, -20, 2, 16, -11, -6, 10];
     const pts = [];
     let r = 1342 - deltas.reduce((a, b) => a + b, 0);
     deltas.forEach(d => { r += d; pts.push(r); });
@@ -99,7 +100,7 @@
       s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.07)"/>`;
       s += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
     });
-    [0, 10, 20, 30, 41].forEach(i => { s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">#${i + 1}</text>`; });
+    [0, 9, 19, 29].forEach(i => { s += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">#${i + 1}</text>`; });
     const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
     s += `<path d="${d} L${x(pts.length - 1)},${y(min)} L${x(0)},${y(min)}Z" fill="url(#g)" opacity=".35"/>`;
     s += `<defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ff8a1f"/><stop offset="1" stop-color="#ff8a1f" stop-opacity="0"/></linearGradient></defs>`;
@@ -113,34 +114,36 @@
 
   // Match history rows
   (function () {
+    // Ranked rows: a 1v1 best of 3 with the round score and rating delta.
+    // Unrated rows: a single round with the placement and no rating.
     const rows = [
-      ['Today 21:40', 'ranked', 1, 'Guest-4821, Kate', '2–1', 14],
-      ['Today 21:12', 'ranked', 2, 'blastqueen, Kate, Ziggy', '1–2', -6],
-      ['Today 20:47', 'unrated', 1, 'Kate', '3–1', null],
-      ['Yesterday', 'ranked', 3, 'kaboom_kid, mira, Guest-1180', '0–2', -11],
-      ['Yesterday', 'ranked', 1, 'mira, tomtom', '2–0', 16],
-      ['3 Nov', 'unrated', 2, 'Guest-0042, Guest-7731', '1–2', null],
-      ['2 Nov', 'ranked', 1, 'Kate, bombastic', '2–1', 12]
+      ['Today 21:58', 'unrated', '3rd of 4', 'Guest-4821, mira, Kate', null, null, [['ROUND', '<b>3rd of 4</b> · eaten by a Brute · 1 alien']]],
+      ['Today 21:40', 'ranked', 'Won', 'Kate', '2–1', 10, [['ROUND 1', '<b>Won</b> · bomb on Kate'], ['ROUND 2', '<b>Lost</b> · bomb by Kate'], ['ROUND 3', '<b>Won</b> · on health, 2 ♥ vs 1 ♥']]],
+      ['Today 21:12', 'ranked', 'Lost', 'nova', '1–2', -6, [['ROUND 1', '<b>Lost</b> · eaten by a Seeker'], ['ROUND 2', '<b>Won</b> · 1 kill · 2 aliens'], ['ROUND 3', '<b>Lost</b> · bomb by nova']]],
+      ['Today 20:47', 'unrated', '1st of 2', 'Kate', null, null, [['ROUND', '<b>1st of 2</b> · 1 kill · 3 aliens']]],
+      ['Yesterday', 'ranked', 'Lost', 'tick_tock', '0–2', -11, [['ROUND 1', '<b>Lost</b> · own bomb'], ['ROUND 2', '<b>Lost</b> · bomb by tick_tock']]],
+      ['Yesterday', 'ranked', 'Won', 'Brick', '2–0', 16, [['ROUND 1', '<b>Won</b> · 1 kill · 2 aliens'], ['ROUND 2', '<b>Won</b> · Brick eaten by a Drifter']]],
+      ['3 Nov', 'unrated', '2nd of 3', 'Guest-0042, Guest-7731', null, null, [['ROUND', '<b>2nd of 3</b> · bomb by Guest-0042']]],
+      ['2 Nov', 'ranked', 'Draw', 'bombastic', '1–1', 2, [['ROUND 1', '<b>Won</b> · bomb on bombastic'], ['ROUND 2', '<b>Lost</b> · eaten by a Brute'], ['ROUND 3', '<b>Draw</b> · both hit on the same tick']]]
     ];
+    const resultCls = r => r === 'Won' || r.startsWith('1st') ? 'place-1' : r === 'Lost' ? 'down' : 'muted';
     const el = document.getElementById('history');
-    el.innerHTML = rows.map(([when, mode, place, opp, score, delta]) => `
+    el.innerHTML = rows.map(([when, mode, result, opp, score, delta, rounds]) => `
       <details class="history-item">
         <summary>
           <span class="muted">${when}</span>
-          <span><span class="badge ${mode === 'ranked' ? 'badge-ranked' : 'badge-unrated'}">${mode === 'ranked' ? 'Ranked' : 'Unrated'}</span></span>
-          <span class="place ${place === 1 ? 'place-1' : ''}">#${place}</span>
+          <span><span class="badge ${mode === 'ranked' ? 'badge-ranked' : 'badge-unrated'}">${mode === 'ranked' ? 'Ranked 1v1' : 'Unrated'}</span></span>
+          <b class="${resultCls(result)}">${result}</b>
           <span class="opp">vs ${opp}</span>
-          <span class="num">${score}</span>
+          <span class="num">${score || '<span class="dim">1 round</span>'}</span>
           <span class="num">${delta == null ? '<span class="dim">–</span>' : delta > 0 ? `<b class="up">▲${delta}</b>` : `<b class="down">▼${-delta}</b>`}</span>
           <svg class="i dim"><use href="#i-chevron-down"/></svg>
         </summary>
         <div class="rounds">
-          <div class="round-box"><h4>ROUND 1</h4><span class="ln"><b>${place === 1 ? 'Won' : 'Lost'}</b> · 2 kills · 1 alien</span></div>
-          <div class="round-box"><h4>ROUND 2</h4><span class="ln"><b>Lost</b> · eaten by a Seeker</span></div>
-          <div class="round-box"><h4>ROUND 3</h4><span class="ln"><b>${place === 1 ? 'Won' : 'Lost'}</b> · 1 kill · 3 aliens</span></div>
+          ${rounds.map(([t, txt]) => `<div class="round-box"><h4>${t}</h4><span class="ln">${txt}</span></div>`).join('')}
         </div>
       </details>`).join('');
-    el.querySelector('details').open = true;
+    el.querySelectorAll('details')[1].open = true;
   })();
 </script>
 </body>

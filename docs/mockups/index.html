@@ -30,19 +30,19 @@
 <script src="mock.js"></script>
 <script>
   const SCREENS = [
-    ['landing.html', 'Landing', '/', 'Animated arena background, play as guest in two clicks, log in and register.',
-      [['guest', 'Guest nickname'], ['login', 'Log in'], ['register', 'Register'], ['register-error', 'Register errors']]],
-    ['lobby.html', 'Lobby', '/lobby', 'Quick Play, create or join an arena, live arena list with filters, own stats.',
-      [['as-guest', 'As guest'], ['quickplay', 'Quick Play'], ['create', 'Create (ranked)'], ['create-private', 'Create (private)'], ['join', 'Join by code'], ['join-error', 'Wrong code'], ['settings', 'Settings']]],
-    ['waiting-room.html', 'Waiting room', '/arena/:id', 'Four player slots, ready states, the rules, a blurred map preview and the host Start button.',
-      [['private', 'Private + code'], ['not-host', 'Non-host']]],
-    ['game.html', 'In-game', '/arena/:id', 'HUD around the 21×21 canvas: timer, round, player cards, aliens, kill feed and every overlay.',
-      [['countdown', 'Countdown'], ['sudden', 'Sudden death'], ['hit', 'Hit'], ['round-end', 'Round end'], ['eaten', 'Eaten'], ['spectating', 'Spectating'], ['esc', 'ESC menu'], ['version', 'New version']]],
-    ['results.html', 'Match results', '/arena/:id', 'Winner, per-round placements, kills, aliens and rating deltas, then back to the waiting room.',
-      [['pending', 'Rating pending'], ['unrated', 'Unrated'], ['draw', 'Draw']]],
-    ['profile.html', 'Profile', '/profile/:username', 'Tier, rating, rank, stats, rating history chart and expandable match history.',
+    ['landing.html', 'Landing', '/', 'Animated arena background, play as guest in two clicks, log in, and register with a confirmed password.',
+      [['guest', 'Guest nickname'], ['login', 'Log in'], ['register', 'Register'], ['register-mismatch', 'Passwords differ'], ['register-error', 'Server errors']]],
+    ['lobby.html', 'Lobby', '/lobby', 'Quick Play (Ranked 1v1, or unrated for guests), create or join an arena, live arena list with Opp ★ rating, own stats. Guests see Ranked rows locked.',
+      [['quickplay', 'Quick Play'], ['create', 'Create (ranked 1v1)'], ['create-private', 'Create (private)'], ['join', 'Join by code'], ['join-error', 'Wrong code'], ['settings', 'Settings'], ['as-guest', 'As guest'], ['quickplay-guest', 'Guest Quick Play'], ['create-guest', 'Guest create'], ['ranked-locked', 'Register to play Ranked']]],
+    ['waiting-room.html', 'Waiting room', '/arena/:id', 'Player slots, ready states, the rules, a blurred map preview and the 15 s all-ready countdown (no Start button). Default: not everyone is ready.',
+      [['countdown', 'Starting in 12'], ['paused', 'Paused: Kate joined'], ['ranked', 'Ranked 1v1'], ['private', 'Private + code'], ['not-host', 'Non-host']]],
+    ['game.html', 'In-game', '/arena/:id', 'HUD around the 21×21 canvas. Default: an unrated 4-player round (no pips). Countdown and round end: a ranked 1v1 best of 3. Plus the phone layout with joystick and bomb button.',
+      [['sudden', 'Sudden death'], ['hit', 'Hit'], ['eaten', 'Eaten'], ['spectating', 'Spectating'], ['esc', 'ESC menu'], ['version', 'New version'], ['countdown', 'Ranked countdown'], ['round-end', 'Ranked round end'], ['touch', 'Touch (phone)']]],
+    ['results.html', 'Match results', '/arena/:id', 'Ranked 1v1: per-round results, wins, points and rating deltas. Unrated: one round, placement and how each player went out. Then back to the waiting room.',
+      [['pending', 'Rating pending'], ['draw', 'Ranked draw'], ['unrated', 'Unrated']]],
+    ['profile.html', 'Profile', '/profile/:username', 'Tier, rating, rank, stats, rating history chart and match history: ranked duels with round score and delta, unrated rounds with placement.',
       [['placement', 'Placement']]],
-    ['leaderboard.html', 'Leaderboard', '/leaderboard', 'Top 3 podium, 25 rows per page, own row pinned at the bottom.', []],
+    ['leaderboard.html', 'Leaderboard', '/leaderboard', 'Ranked 1v1 ratings: top 3 podium, 25 rows per page, own row pinned at the bottom.', []],
     ['not-found.html', 'Not found', '/:pathMatch(.*)', 'The 404 page.', []]
   ];
   document.getElementById('grid').innerHTML = SCREENS.map(([file, title, route, desc, states]) => `
