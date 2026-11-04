@@ -168,7 +168,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ ← Leave     noobs only   🔒 Code: K7M2QX [copy] [copy link]        │
+│ ← Leave     noobs only   (private rooms: 🔒 Code K7M2QX [copy])    │
 ├──────────────────────────────────────────────────────────────────┤
 │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐                     │
 │  │ 🟦 P1  │ │ 🟧 P2  │ │ 🟩 P3  │ │  empty │                     │
@@ -273,7 +273,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
   - username, tier badge, **rating** (peak in small text), **global rank**, or "Placement 4/10" while still in the placement period;
   - member since, total matches, wins, win rate, kills, alien kills, deaths by alien.
 - **Rating history chart:** a line chart of the last 100 rated matches, with tier bands shaded in the background.
-- **Match history table:** paginated, with a Ranked/Unrated badge, the round score (e.g. 2–1) and the rating delta per match. Each row expands to show per-round detail.
+- **Match history table:** paginated, with a Ranked 1v1 / Unrated badge. Ranked rows show Won/Lost/Draw, the round score (e.g. 2–1) and the rating delta. Unrated rows show the placement ("2nd of 4") and no rating. Each row expands to show per-round detail.
 
 ### 4.7a Leaderboard
 
@@ -295,7 +295,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 
 | Tab | Options |
 |---|---|
-| Controls | Remap Up/Down/Left/Right/Bomb, alternate keys |
+| Controls | Remap Up/Down/Left/Right/Bomb, alternate keys. Touch (§7.1): touch controls Auto / On / Off, joystick size S/M/L, left-handed mode, haptics on/off |
 | Audio | Master, SFX, Music volume, mute |
 | Display | Scale (auto / 2× / 3×), show ping, show FPS, reduced motion, colorblind palette |
 | Network | Region override, interpolation mode (auto / smoother / lower latency) |

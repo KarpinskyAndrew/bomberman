@@ -287,12 +287,15 @@ WAITING ─(≥2 players, all ready)─► READY_COUNTDOWN (15 s) ─► COUNTDO
    │        └──────────────────────────┘ un-readies or leaves          │ match open    ▼
    │                                                                   │ (Ranked only)
    └──── MATCH_END (12 s) ◄──────────── match decided ──────────── ROUND_END (5 s) ────┘
+                  ▲                                                                    │
+                  └──────────────── Unrated: round over, skip ROUND_END ───────────────┘
 ```
 
 - **WAITING:** between matches. Players can join, leave and ready up, and the host can change settings (Unrated only).
 - **READY_COUNTDOWN** (15 s): starts as soon as at least 2 players are in and **all** of them are Ready (§5.2). It is the last chance for more players to join, and it pauses whenever someone is not ready.
-- **COUNTDOWN → PLAYING → ROUND_END:** one round. A new random map is generated for every round.
-- **ROUND_END** (5 s): shows the round winner and the current score. In **Ranked**, the next round's COUNTDOWN starts automatically if the match is still open. In **Unrated**, the match is always decided after its single round.
+- **COUNTDOWN → PLAYING:** one round. A new random map is generated for every round.
+- **ROUND_END** (5 s, **Ranked only**): shows the round winner and the series score. If the match is still open, the next round's COUNTDOWN starts automatically; otherwise MATCH_END follows.
+- **Unrated** has a single round, so PLAYING goes **straight to MATCH_END** and there is no ROUND_END state. The server still sends `round.end` (with `matchDecided: true`) right before `match.end`, so clients handle both modes the same way.
 - **MATCH_END** (12 s): shows the final standings and rating changes, then the arena goes back to WAITING. Players stay unless they leave.
 - A ranked best-of-3 lasts at most about **10 min**: 3 × (3 s + 3 min + 5 s) + 12 s. An unrated match lasts at most about **3.5 min**.
 
@@ -344,8 +347,9 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
 - **Disconnect during PLAYING:** the character stays in game (idle) for **15 s**, waiting for a reconnect. An idle character can still be killed. After 15 s the player is eliminated, and their elimination tick is the moment the grace period ran out.
 - **Disconnect between rounds:** a player who is not back by the end of the next COUNTDOWN is eliminated at tick 0 of that round, which puts them last. They can rejoin in later rounds of the same match.
 - **Leaving voluntarily** (ESC → Leave) is a **forfeit**:
-  - The player is eliminated immediately in the current round and placed last in every remaining round.
-  - In the match placement, forfeiting players rank **below everyone who stayed**. Among several forfeiters, whoever left later ranks higher.
+  - The player is eliminated immediately, at the current tick.
+  - **Ranked:** the forfeiter **loses the match** right away (§4.8.3), whatever the round score was, and the opponent wins it.
+  - **Unrated:** the forfeiter ranks **below everyone who stayed**. Among several forfeiters, whoever left later ranks higher.
   - So rage-quitting never improves a result.
 - If only **one** player who has not forfeited is left, the match ends immediately and that player wins it.
 
