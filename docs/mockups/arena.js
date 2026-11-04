@@ -2,7 +2,8 @@
    It only draws a still/looping scene for the mockups. It is NOT the game renderer
    and has no game rules beyond what is needed to place things believably.
 
-   Arena.mount(canvas, scene) -> { update(scene) }
+   Arena.mount(canvas, scene) -> { update(scene), draw() }
+   scene._map (0 empty, 1 soft, 2 hard) and scene._fire may be mutated in place by a live demo.
    scene = {
      seed, density,            // map generation (21x21, hard border + pillars on even tiles)
      cover,                    // true: fill the whole host (background); false: fit inside it
@@ -444,7 +445,9 @@
       requestAnimationFrame(loop);
     }
     return {
-      update(next) { scene = next; prepare(scene); canvas._t = 0; redraw(); }
+      update(next) { scene = next; prepare(scene); canvas._t = 0; redraw(); },
+      // For live demos (touch.js) that mutate the scene in place: draw one frame now.
+      draw() { redraw(); }
     };
   }
 

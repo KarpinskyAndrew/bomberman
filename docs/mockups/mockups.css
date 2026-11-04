@@ -620,8 +620,18 @@ body:has(#hit:target) .pcard.me .hearts { animation: shake 0.4s infinite; }
 .joy .arr.u { left: 51px; top: -26px; transform: rotate(180deg); }
 .joy .arr.d { left: 51px; bottom: -26px; }
 .joy .arr.l { left: -26px; top: 51px; transform: rotate(90deg); }
-.joy .arr.r { right: -26px; top: 51px; transform: rotate(-90deg); color: var(--fire-1); filter: drop-shadow(0 0 6px rgba(255, 221, 85, 0.7)); }
-.joy .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; transform: translateX(36px); border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f3f1ea, #a7adbd); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.08); }
+.joy .arr.r { right: -26px; top: 51px; transform: rotate(-90deg); }
+.joy[data-dir="u"] .arr.u, .joy[data-dir="d"] .arr.d, .joy[data-dir="l"] .arr.l, .joy[data-dir="r"] .arr.r { color: var(--fire-1); filter: drop-shadow(0 0 6px rgba(255, 221, 85, 0.7)); }
+.joy .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f3f1ea, #a7adbd); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.08); }
+/* Floating joystick: dimmed where it rests, full strength under the thumb (touch.js moves it). */
+.joy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
+.joy.active { opacity: 1; transition: none; }
+.bomb-btn { border: 0; padding: 0; cursor: pointer; font: inherit; -webkit-tap-highlight-color: transparent; transition: transform 0.08s, filter 0.15s; }
+.bomb-btn.pressed { transform: scale(0.92); }
+.bomb-btn.empty { filter: grayscale(0.85) brightness(0.65); }
+.bomb-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+.t-msg { color: var(--fire-1); font-weight: 600; text-align: right; }
+.t-controls { cursor: grab; -webkit-user-select: none; -webkit-touch-callout: none; }
 .joy .touch-dot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
 .bomb-btn { position: absolute; right: 34px; top: 50%; width: 92px; height: 92px; margin-top: -56px; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 2px; color: #1d1305; background: linear-gradient(180deg, var(--fire-1), var(--fire-2)); box-shadow: 0 10px 30px rgba(255, 138, 31, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.18); text-decoration: none; }
 .bomb-btn .i { width: 36px; height: 36px; }

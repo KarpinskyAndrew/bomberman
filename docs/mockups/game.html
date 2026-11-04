@@ -176,9 +176,9 @@
       <a class="icon-btn" href="#" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></a>
     </div>
     <div class="t-stage arena-host"><canvas id="touch-arena" aria-label="Arena"></canvas></div>
-    <div class="t-info"><span><b>ROUND 2 / 3</b> · duel night</span><span class="num" style="color:var(--fire-1)"><svg class="i"><use href="#i-warn"/></svg> Sudden death in 0:22</span></div>
+    <div class="t-info"><span><b>ROUND 2 / 3</b> · duel night</span><span class="t-msg" role="status" data-idle="Try it: drag left, tap the bomb">Try it: drag left, tap the bomb</span></div>
     <div class="t-controls">
-      <div class="joy" aria-label="Joystick: moving right">
+      <div class="joy" aria-label="Joystick">
         <span class="dz" aria-hidden="true"></span>
         <svg class="i arr u"><use href="#i-chevron-down"/></svg>
         <svg class="i arr d"><use href="#i-chevron-down"/></svg>
@@ -187,12 +187,12 @@
         <span class="touch-dot" aria-hidden="true"></span>
         <span class="knob" aria-hidden="true"></span>
       </div>
-      <a class="bomb-btn" href="#touch" aria-label="Drop bomb, 1 of 2 in use"><svg class="i"><use href="#i-bomb"/></svg><b>1/2</b></a>
-      <span class="t-cap l">Joystick appears where your thumb lands</span>
+      <button class="bomb-btn" type="button" aria-label="Drop bomb, 0 of 2 in use"><svg class="i"><use href="#i-bomb"/></svg><b>0/2</b></button>
+      <span class="t-cap l">Touch anywhere here: the joystick appears under your thumb</span>
       <span class="t-cap r">Bomb</span>
     </div>
   </div>
-  <span class="phone-label">Touch layout · 390 × 844 portrait · <a href="#">back to desktop</a></span>
+  <span class="phone-label">Touch layout · playable demo · on a laptop, drag with the mouse or use arrows + SPACE · <a href="#">back to desktop</a></span>
 </section>
 
 <script src="arena.js"></script>
@@ -243,14 +243,8 @@
   const view = Arena.mount(document.getElementById('arena'), scene());
   window.addEventListener('hashchange', () => view.update(scene()));
   Arena.portrait(document.getElementById('brute-portrait'), { type: 'brute', hp: 3 }, 88);
-  // Phone preview: ranked round 2 in progress, Andrew walks right away from his bomb.
-  Arena.mount(document.getElementById('touch-arena'), {
-    seed: 23, density: 0.62, names: true,
-    players: [{ x: 7, y: 9, color: C.p1, name: 'Andrew', dir: 'r' }, { x: 13, y: 13, color: C.p3, name: 'Kate', dir: 'l' }],
-    aliens: [{ type: 'seeker', x: 9, y: 5, locked: true, target: [7, 9] }, { type: 'drifter', x: 15, y: 5 }, { type: 'brute', x: 3, y: 15 }],
-    bombs: [{ x: 6, y: 9 }],
-    items: [{ x: 11, y: 9, kind: 'fire' }]
-  });
 </script>
+<!-- Phone preview (#touch) is playable: joystick, bomb button and a tiny simulation. -->
+<script src="touch.js"></script>
 </body>
 </html>
