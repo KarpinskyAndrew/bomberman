@@ -19,7 +19,7 @@ Related documents:
 
 | Version | Changes |
 |---|---|
-| 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. |
+| 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. **Arena size** is a setting: Small 15×15, Medium 17×17, Large 21×21, defaulting to the player count; Ranked is always Small (§4.1). |
 | 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
 | 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
 | 0.6 | **Go confirmed** for the backend after reviewing the alternatives (§6.2). The game rules stay in Go. The client re-implements only what it predicts (own movement and bomb placement), and **shared test vectors generated from the Go simulation** keep the two in sync. The networking code we write ourselves is listed and sized in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy). |
@@ -33,7 +33,7 @@ Related documents:
 
 ## 1. Overview
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a 21×21 grid, place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of two game modes:
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a grid of 15×15 to 21×21 tiles (smaller for fewer players), place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of two game modes:
 
 - **Ranked:** a **1-vs-1** duel between two registered players, played as **best of 3 rounds**. The winner gains **ELO rating** and the loser loses it.
 - **Unrated:** **2–4 players**, a **single round**, just for fun.
@@ -63,7 +63,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 | **Arena** | A game room. It has its own map, players, aliens and match lifecycle. |
 | **Round** | A single game: one map, from countdown to the last player standing (or a draw). |
 | **Match** | What an arena plays from start to final standings. **Ranked:** a best-of-3 series of rounds between 2 players. **Unrated:** exactly 1 round. ELO is applied per ranked match. |
-| **Tile** | One cell of the 21×21 grid. |
+| **Tile** | One cell of the arena grid (15×15, 17×17 or 21×21, §4.1). |
 | **Hard wall** | An indestructible wall. |
 | **Soft wall** | A destructible wall that is placed randomly and can be destroyed by fire. |
 | **Fire / blast** | The cross-shaped explosion a bomb produces. |
@@ -121,22 +121,35 @@ All durations below are given in seconds. The server counts them in **ticks at 6
 
 ### 4.1 Map
 
-- The grid is **21 × 21** tiles. Coordinates are `(x, y)` with `0 ≤ x, y ≤ 20` and the origin at the top-left.
+- The grid is square, **S × S** tiles, with three sizes:
+
+  | Size | S | Default for | Default max aliens | Sudden-death speed |
+  |---|---|---|---|---|
+  | **Small** | **15** | 2 players, and **always in Ranked** | 2 | 1 tile / 0.75 s [45 ticks] |
+  | **Medium** | **17** | 3 players | 3 | 1 tile / 0.65 s [39 ticks] |
+  | **Large** | **21** | 4 players | 4 | 1 tile / 0.5 s [30 ticks] |
+
+  - Fewer players get a smaller arena, so a duel doesn't turn into a long search for the opponent, and the arena stays readable on a phone.
+  - The size follows the max players by default. In **Unrated**, the host can pick any size (e.g. 4 players on Small for chaos). **Ranked** is always Small.
+  - S is always odd, so the border and pillar pattern below works the same for every size.
+- Coordinates are `(x, y)` with `0 ≤ x, y ≤ S − 1` and the origin at the top-left.
 - **Hard walls (indestructible):**
-  - The outer border: every tile with `x = 0`, `x = 20`, `y = 0` or `y = 20`.
+  - The outer border: every tile with `x = 0`, `x = S − 1`, `y = 0` or `y = S − 1`.
   - Pillars on every second row and column: every tile where **both `x` and `y` are even**.
 - **Every other tile** (odd x or odd y, not on the border) is either **empty** or a **soft wall**, decided randomly when the match is generated:
   - Soft wall density: **65 %** by default (configurable in Unrated arenas: 40–85 %).
   - **Every round gets a new random map.**
   - **Spawn safe zones** are always empty: the spawn tile plus the two tiles next to it along the corridors (an L shape). This guarantees that a player can place a bomb and escape.
-- Spawn points (up to 4 players), one per corner:
+- Spawn points (up to 4 players), one per corner. With `E = S − 2` (the last walkable row/column: 13, 15 or 19):
 
   | Slot | Spawn | Safe tiles |
   |---|---|---|
   | P1 | (1, 1) | (2, 1), (1, 2) |
-  | P2 | (19, 1) | (18, 1), (19, 2) |
-  | P3 | (1, 19) | (2, 19), (1, 18) |
-  | P4 | (19, 19) | (18, 19), (19, 18) |
+  | P2 | (E, 1) | (E − 1, 1), (E, 2) |
+  | P3 | (1, E) | (2, E), (1, E − 1) |
+  | P4 | (E, E) | (E − 1, E), (E, E − 1) |
+
+  - With **2 players** they start in **opposite corners**: P1 at (1, 1) and P2 at (E, E). With 3 players the corners are P1, P2, P3 as listed.
 
 - The map generator uses a seeded PRNG. Each round has its own seed, stored with the match, so the map, and with the recorded inputs the whole round, can be reproduced and debugged.
 
@@ -270,7 +283,7 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 
 #### 4.7.3 Spawning
 
-- Arena settings: **aliens on/off** (default on) and **max aliens** from 0 to 8 (default 4). Ranked arenas always use the default (§5.4.2).
+- Arena settings: **aliens on/off** (default on) and **max aliens** from 0 to 8 (default by arena size: 2 / 3 / 4, §4.1). Ranked arenas always use the default for Small, which is 2 (§5.4.2).
 - **At round start:** `max aliens` aliens spawn on random empty tiles that are at least **6 tiles (Manhattan distance)** away from every player spawn. If there are not enough empty tiles, the generator clears soft walls to make room.
 - **Respawn:** every **30 s** [1800 ticks], if fewer than `max aliens` are alive, one new alien spawns on a random empty tile at least **5 tiles from every living player**.
 - **Spawn warning:** a portal glows on the spawn tile for 1.5 s [90 ticks] before the alien appears. During that time the tile is harmless and the alien cannot be hurt.
@@ -304,7 +317,7 @@ WAITING ─(≥2 players, all ready)─► READY_COUNTDOWN (15 s) ─► COUNTDO
 - **Players per arena:** **Ranked: exactly 2.** **Unrated: 2–4.** Bigger arenas are out of scope for now.
 - **Time limit:** 3 min.
 - **Sudden death** starts at **2:00**:
-  - Hard walls start filling the arena in a spiral from the border inward, one tile every 0.5 s. That is 120 tiles by 3:00.
+  - Hard walls start filling the arena in a spiral from the border inward. The speed depends on the arena size (§4.1) so that every size loses the same share of its area: one tile every 0.5 s on Large (120 tiles by 3:00), 0.65 s on Medium (≈ 92 tiles), 0.75 s on Small (80 tiles).
   - A player under a falling wall is eliminated. An alien under one dies **without** dropping anything.
   - The HUD shows a sudden-death warning 10 s before it starts.
 - **Round result** (aliens do not count; they cannot win):
@@ -367,8 +380,8 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
   - **Create Arena:**
     - Name, region (lowest ping preselected), private (yes/no).
     - **Game mode:** **Ranked** or **Unrated**.
-    - **Ranked:** always 2 players, public and the locked standard rules (§5.4.2). Not offered to guests.
-    - **Unrated:** max players (2–4), soft wall density, wall drop rate, aliens on/off, max aliens. Always a single round.
+    - **Ranked:** always 2 players on a Small arena, public and the locked standard rules (§5.4.2). Not offered to guests.
+    - **Unrated:** max players (2–4), **arena size** (Small 15 / Medium 17 / Large 21, defaulting to the max players, §4.1), soft wall density, wall drop rate, aliens on/off, max aliens. Always a single round.
   - **Join**: by clicking an arena in the list, or by entering a **6-character invite code** for a private arena. Guests clicking a Ranked arena get a "Register to play Ranked" prompt.
 - The list refreshes live over the socket.
 
@@ -415,7 +428,7 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
 A match is **rated** only if **all** of these hold:
 
 1. The arena is **public** and in **Ranked** mode. Private arenas can only be Unrated, which stops friends from boosting each other.
-2. The arena uses the **standard ruleset**, which is locked in Ranked mode: 2 players, best-of-3, 65 % walls, 30 % wall drops, aliens on, max 4 aliens.
+2. The arena uses the **standard ruleset**, which is locked in Ranked mode: 2 players, best-of-3, Small 15×15 arena, 65 % walls, 30 % wall drops, aliens on, max 2 aliens.
 3. **Both** players on the roster are registered. Guests cannot join Ranked arenas (§3.4), so this always holds; the rating worker still checks it.
 4. The match reached a result (§4.8.3). A match that ended early because the opponent forfeited **is** rated, and the forfeiter loses.
 5. The match finished normally. If a server crashes mid-match, the whole match, including rounds already played, is not rated (see [Events §9](./EVENTS-AND-MESSAGING.md#9-failure-scenarios)).
@@ -548,7 +561,7 @@ Domain errors map to gRPC status codes (`NotFound`, `InvalidArgument`, `AlreadyE
 
 **Why Go fits this game:**
 
-- The server only runs game rules: a 21×21 grid, ≤ 4 players, a few aliens, tile-by-tile integer movement. No engine, physics or rendering is needed on the server.
+- The server only runs game rules: a grid of at most 21×21, ≤ 4 players, a few aliens, tile-by-tile integer movement. No engine, physics or rendering is needed on the server.
 - The workload is many small concurrent arenas and many WebSocket connections. One goroutine per arena plus two per connection is cheap, and the language handles this well.
 - Garbage collection pauses are typically well under 1 ms. The simulation makes 0 allocations per tick ([Server & Network §3.2](./SERVER-AND-NETWORK.md#32-the-simulation-package-internalgame)), and one tick is 16.7 ms, so GC is far below network jitter.
 - Small static binaries make small container images, and one language covers the API, game server, worker and bots.
@@ -675,7 +688,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 1. A visitor can register, log in, log out, or start as a guest in ≤ 2 clicks.
 2. The lobby lists arenas live with region, ping, Ranked/Unrated badge and match progress. A player can quick-play, create (public/private, Ranked/Unrated) and join by code.
-3. Every generated map is 21×21, has hard walls on the border and on every (even, even) tile, has soft walls only on other tiles, and has the 4 spawn safe zones clear.
+3. Every generated map has the arena's size (15×15, 17×17 or 21×21; always 15×15 in Ranked), has hard walls on the border and on every (even, even) tile, has soft walls only on other tiles, and has the spawn safe zones clear. Two players start in opposite corners.
 4. SPACE places a bomb that explodes after 3 s in a + shape limited by range. Fire stops at hard walls, destroys the first soft wall it hits in each direction, and sets off other bombs.
 5. A player starts with 1 bomb. Each **+Bomb** collectible lets them have one more bomb on the field at the same time, up to 8.
 6. Destroyed soft walls sometimes drop +Health, +Fire or +Bomb, and the caps are enforced.

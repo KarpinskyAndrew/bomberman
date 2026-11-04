@@ -213,10 +213,13 @@
       </div>
       <div class="divider-label">Custom rules · Unrated only</div>
       <div class="field"><span class="label">Format</span><span class="fixed-value">Best of 3 <small>follows the mode</small></span></div>
+      <div class="field locked"><span class="label">Arena size <svg class="i"><use href="#i-lock"/></svg></span>
+        <div class="seg"><input type="radio" name="as" id="as15" checked disabled><label for="as15">Small 15×15</label><input type="radio" name="as" id="as17" disabled><label for="as17">Medium 17×17</label><input type="radio" name="as" id="as21" disabled><label for="as21">Large 21×21</label></div>
+      </div>
       <div class="field locked"><span class="label">Wall density <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="40" max="85" value="65" disabled><output>65 %</output></div></div>
       <div class="field locked"><span class="label">Wall drops <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="60" value="30" disabled><output>30 %</output></div></div>
-      <div class="field locked"><span class="label">Aliens <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="8" value="4" disabled><output>max 4</output></div></div>
-      <p class="hint">Ranked is always a 1-vs-1 duel, best of 3, with the standard rules, so ratings stay comparable.</p>
+      <div class="field locked"><span class="label">Aliens <svg class="i"><use href="#i-lock"/></svg></span><div class="range-row"><input type="range" min="0" max="8" value="2" disabled><output>max 2</output></div></div>
+      <p class="hint">Ranked is always a 1-vs-1 duel, best of 3, on a Small arena with the standard rules, so ratings stay comparable.</p>
     </div>
     <div class="modal-foot"><a class="btn btn-ghost" href="#">Cancel</a><a class="btn btn-primary" href="waiting-room.html#ranked">Create</a></div>
   </div>
@@ -239,6 +242,10 @@
       </div>
       <div class="divider-label">Custom rules</div>
       <div class="field"><span class="label">Format</span><span class="fixed-value">Single round <small>follows the mode</small></span></div>
+      <div class="field"><span class="label">Arena size</span>
+        <div class="seg"><input type="radio" name="pas" id="pas15"><label for="pas15">Small 15×15</label><input type="radio" name="pas" id="pas17" checked><label for="pas17">Medium 17×17</label><input type="radio" name="pas" id="pas21"><label for="pas21">Large 21×21</label></div>
+        <span class="hint">Picked by hand: 4 players on Medium is tighter than the default Large.</span>
+      </div>
       <div class="field"><span class="label">Wall density</span><div class="range-row"><input type="range" min="40" max="85" value="80"><output>80 %</output></div></div>
       <div class="field"><span class="label">Wall drops</span><div class="range-row"><input type="range" min="0" max="60" value="45"><output>45 %</output></div></div>
       <div class="field"><label class="check"><input type="checkbox" checked> Aliens</label><div class="range-row"><input type="range" min="0" max="8" value="6"><output>max 6</output></div></div>
@@ -261,6 +268,10 @@
       </div>
       <div class="divider-label">Custom rules</div>
       <div class="field"><span class="label">Format</span><span class="fixed-value">Single round <small>follows the mode</small></span></div>
+      <div class="field"><span class="label">Arena size</span>
+        <div class="seg"><input type="radio" name="gas" id="gas15"><label for="gas15">Small 15×15</label><input type="radio" name="gas" id="gas17"><label for="gas17">Medium 17×17</label><input type="radio" name="gas" id="gas21" checked><label for="gas21">Large 21×21</label></div>
+        <span class="hint">Follows max players (2 → Small, 3 → Medium, 4 → Large) until you pick one.</span>
+      </div>
       <div class="field"><span class="label">Wall density</span><div class="range-row"><input type="range" min="40" max="85" value="65"><output>65 %</output></div></div>
       <div class="field"><span class="label">Wall drops</span><div class="range-row"><input type="range" min="0" max="60" value="30"><output>30 %</output></div></div>
       <div class="field"><label class="check"><input type="checkbox" checked> Aliens</label><div class="range-row"><input type="range" min="0" max="8" value="4"><output>max 4</output></div></div>

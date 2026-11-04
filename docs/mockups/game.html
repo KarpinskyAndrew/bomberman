@@ -203,15 +203,16 @@
     const h = location.hash.slice(1);
     // Ranked 1v1 (round 2): countdown at spawn, then the round end after Kate's bomb got Andrew.
     if (h === 'countdown') {
-      return { seed: 23, density: 0.62, spawnPulse: true, names: true,
-        players: [{ x: 1, y: 1, color: C.p1, name: 'Andrew' }, { x: 19, y: 19, color: C.p3, name: 'Kate' }] };
+      // Ranked is always the Small 15x15 arena; two players start in opposite corners.
+      return { seed: 23, density: 0.62, spawnPulse: true, names: true, size: 15,
+        players: [{ x: 1, y: 1, color: C.p1, name: 'Andrew' }, { x: 13, y: 13, color: C.p3, name: 'Kate' }] };
     }
     if (h === 'round-end') {
-      return { seed: 23, density: 0.62, names: true, still: true,
+      return { seed: 23, density: 0.62, names: true, still: true, size: 15,
         players: [{ x: 5, y: 3, color: C.p1, name: 'Andrew', dead: true }, { x: 9, y: 7, color: C.p3, name: 'Kate', dir: 'l' }],
-        aliens: [{ type: 'drifter', x: 11, y: 13 }, { type: 'brute', x: 17, y: 15, hp: 3 }],
+        aliens: [{ type: 'drifter', x: 11, y: 11 }, { type: 'brute', x: 13, y: 9, hp: 3 }],
         fires: [{ x: 5, y: 5, range: 2 }], clear: [[5, 4], [5, 3]],
-        items: [{ x: 9, y: 1, kind: 'health' }, { x: 13, y: 15, kind: 'bomb' }] };
+        items: [{ x: 9, y: 1, kind: 'health' }, { x: 3, y: 11, kind: 'bomb' }] };
     }
     // Unrated round, 4 players: Kate was already eaten by the Brute.
     const base = {

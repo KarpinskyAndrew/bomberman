@@ -96,20 +96,20 @@
       <section class="panel panel-pad stack">
         <div class="rules on-public">
           <span class="chip">Unrated</span>
-          <span class="chip">1 round</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip">1 round</span><span class="chip">Large 21×21</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
           <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
           <a class="btn btn-sm btn-ghost host-only" href="#"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
         </div>
         <div class="rules on-private">
           <span class="chip">Unrated</span>
-          <span class="chip">1 round</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
+          <span class="chip">1 round</span><span class="chip">Medium 17×17</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
           <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 6</span>
           <a class="btn btn-sm btn-ghost host-only" href="#private"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
         </div>
         <div class="rules on-ranked">
           <span class="chip hot"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
-          <span class="chip">Best of 3</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
-          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
+          <span class="chip">Best of 3</span><span class="chip">Small 15×15</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 2</span>
         </div>
         <p class="hint on-public">One round, last player standing wins. Unrated arenas are never rated, and guests are welcome. <span class="host-only">Changing a rule un-readies everyone.</span></p>
         <p class="hint on-private">Private arenas are never rated. Share the code or the link to invite friends. <span class="host-only">Changing a rule un-readies everyone.</span></p>
@@ -143,7 +143,7 @@
 
     <aside class="stack">
       <section class="panel">
-        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px"><span class="not-ranked">21 × 21 · one round</span><span class="on-ranked">21 × 21 · new map every round</span></span></div>
+        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px"><span class="on-public">Large 21 × 21 · one round</span><span class="on-private">Medium 17 × 17 · one round</span><span class="on-ranked">Small 15 × 15 · new map every round</span></span></div>
         <div style="padding:14px"><div class="map-preview arena-host"><canvas id="preview" aria-hidden="true"></canvas><div class="veil">Revealed at the countdown</div></div></div>
       </section>
       <section class="panel panel-pad">
@@ -162,7 +162,10 @@
 <script src="arena.js"></script>
 <script src="mock.js"></script>
 <script>
-  Arena.mount(document.getElementById('preview'), { seed: 42, density: 0.65, still: true });
+  // The map preview follows the arena size: Large for the default room, Medium for the private one, Small for ranked.
+  const sizeFor = h => (h === 'ranked' ? 15 : h === 'private' ? 17 : 21);
+  const preview = Arena.mount(document.getElementById('preview'), { seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) });
+  window.addEventListener('hashchange', () => preview.update({ seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) }));
 </script>
 </body>
 </html>

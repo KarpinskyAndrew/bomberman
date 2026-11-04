@@ -12,7 +12,7 @@ This document is the **source of truth for the database schema**. It lists every
 
 | Version | Changes |
 |---|---|
-| 0.3 | Follows SPEC v0.9: ranked is 1-vs-1 best-of-3, unrated is a single round. `matches.best_of` is now 1 or 3 and tied to `mode` (`matches_format_check`), and the standard ruleset no longer fixes `best_of`. `match_players` bounds tightened: `round_wins` 0–2, `round_points` 0–9. |
+| 0.3 | Follows SPEC v0.9: ranked is 1-vs-1 best-of-3, unrated is a single round. `matches.best_of` is now 1 or 3 and tied to `mode` (`matches_format_check`), and the standard ruleset no longer fixes `best_of`. `match_players` bounds tightened: `round_wins` 0–2, `round_points` 0–9. New column `matches.arena_size` (15 / 17 / 21); the standard ruleset is 15×15 with max 2 aliens. |
 | 0.2 | v1 runs PostgreSQL as a container on one VM (SPEC §8), so database roles are password login roles created by an init script instead of Cloud SQL IAM users (§7). Migrations move from golang-migrate to **Goose** (file names and `NO TRANSACTION`, §8). Housekeeping runs inside the worker (§6.1). The tables themselves are unchanged. |
 | 0.1 | First version. Builds on SPECIFICATION §7 v0.6 with these changes: per-round player results move from `match_rounds.players JSONB` into a real table, `match_round_players`. Password hashes move to `user_credentials`. Refresh tokens get rotation families and a binary hash. Matches store their full ruleset and the simulation version. The inbox is keyed per consumer. Every constraint has an explicit name. |
 
@@ -300,6 +300,7 @@ One row per finished best-of-N match that had **at least one registered player**
 | **Ruleset** (value object, §4.2) | | | |
 | `ruleset` | `TEXT` | no | `standard` \| `custom` |
 | `best_of` | `SMALLINT` | no | **3** for ranked, **1** for unrated (SPEC §4.8.3) |
+| `arena_size` | `SMALLINT` | no | 15, 17 or 21 (tiles per side, SPEC §4.1). Always 15 for ranked. |
 | `wall_density_pct` | `SMALLINT` | no | 40–85 |
 | `wall_drop_pct` | `SMALLINT` | no | 0–60 |
 | `aliens_enabled` | `BOOLEAN` | no | |
@@ -324,6 +325,7 @@ CREATE TABLE matches (
   private           BOOLEAN     NOT NULL,
   ruleset           TEXT        NOT NULL,
   best_of           SMALLINT    NOT NULL,
+  arena_size        SMALLINT    NOT NULL,
   wall_density_pct  SMALLINT    NOT NULL,
   wall_drop_pct     SMALLINT    NOT NULL,
   aliens_enabled    BOOLEAN     NOT NULL,
@@ -346,11 +348,12 @@ CREATE TABLE matches (
   CONSTRAINT matches_format_check      CHECK ((mode = 'ranked' AND best_of = 3) OR (mode = 'unrated' AND best_of = 1)),
   CONSTRAINT matches_rounds_check      CHECK (rounds_played BETWEEN 1 AND best_of),
   CONSTRAINT matches_rule_values_check CHECK (
-    wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
+    arena_size IN (15, 17, 21)
+    AND wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
   -- 'standard' means exactly the locked map rules (SPEC §5.4.2 item 2); the format follows the mode
   CONSTRAINT matches_standard_ruleset_check CHECK (
-    ruleset <> 'standard' OR (wall_density_pct = 65 AND wall_drop_pct = 30
-                              AND aliens_enabled AND max_aliens = 4)),
+    ruleset <> 'standard' OR (arena_size = 15 AND wall_density_pct = 65 AND wall_drop_pct = 30
+                              AND aliens_enabled AND max_aliens = 2)),
   -- Ranked arenas are public and use the standard ruleset (SPEC §5.1, §5.4.2)
   CONSTRAINT matches_ranked_check      CHECK (mode <> 'ranked' OR (ruleset = 'standard' AND NOT private)),
   -- Only ranked matches can be rated

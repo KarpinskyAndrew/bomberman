@@ -612,17 +612,17 @@ body:has(#hit:target) .pcard.me .hearts { animation: shake 0.4s infinite; }
 .t-stage { position: relative; flex: none; width: 100%; aspect-ratio: 1; background: #070a12; }
 .t-info { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--edge); }
 .t-info b { color: var(--ink); font: 400 12px var(--font-display); letter-spacing: 0.04em; }
-.t-controls { position: relative; flex: 1; min-height: 190px; touch-action: none; user-select: none; }
+.t-controls { position: relative; flex: 1; min-height: 150px; touch-action: none; user-select: none; }
 .t-controls::after { content: ""; position: absolute; left: 50%; top: 16px; bottom: 16px; border-left: 1px dashed rgba(255, 255, 255, 0.06); }
-.joy { position: absolute; left: 34px; top: 50%; width: 124px; height: 124px; margin-top: -72px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.16); background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 70%); }
+.joy { position: absolute; left: 34px; top: 50%; width: 96px; height: 96px; margin-top: -58px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.16); background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 70%); }
 .joy .dz { position: absolute; inset: 37.5%; border-radius: 50%; border: 1px dashed rgba(255, 255, 255, 0.18); }
-.joy .arr { position: absolute; width: 18px; height: 18px; color: rgba(255, 255, 255, 0.22); }
-.joy .arr.u { left: 51px; top: -26px; transform: rotate(180deg); }
-.joy .arr.d { left: 51px; bottom: -26px; }
-.joy .arr.l { left: -26px; top: 51px; transform: rotate(90deg); }
-.joy .arr.r { right: -26px; top: 51px; transform: rotate(-90deg); }
+.joy .arr { position: absolute; width: 16px; height: 16px; color: rgba(255, 255, 255, 0.22); }
+.joy .arr.u { left: 38px; top: -22px; transform: rotate(180deg); }
+.joy .arr.d { left: 38px; bottom: -22px; }
+.joy .arr.l { left: -22px; top: 38px; transform: rotate(90deg); }
+.joy .arr.r { right: -22px; top: 38px; transform: rotate(-90deg); }
 .joy[data-dir="u"] .arr.u, .joy[data-dir="d"] .arr.d, .joy[data-dir="l"] .arr.l, .joy[data-dir="r"] .arr.r { color: var(--fire-1); filter: drop-shadow(0 0 6px rgba(255, 221, 85, 0.7)); }
-.joy .knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f3f1ea, #a7adbd); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.08); }
+.joy .knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f3f1ea, #a7adbd); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.08); }
 /* Floating joystick: dimmed where it rests, full strength under the thumb (touch.js moves it). */
 .joy { opacity: 0.45; pointer-events: none; transition: opacity 0.15s; }
 .joy.active { opacity: 1; transition: none; }
@@ -633,9 +633,9 @@ body:has(#hit:target) .pcard.me .hearts { animation: shake 0.4s infinite; }
 .t-msg { color: var(--fire-1); font-weight: 600; text-align: right; }
 .t-controls { cursor: grab; -webkit-user-select: none; -webkit-touch-callout: none; }
 .joy .touch-dot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
-.bomb-btn { position: absolute; right: 34px; top: 50%; width: 92px; height: 92px; margin-top: -56px; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 2px; color: #1d1305; background: linear-gradient(180deg, var(--fire-1), var(--fire-2)); box-shadow: 0 10px 30px rgba(255, 138, 31, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.18); text-decoration: none; }
-.bomb-btn .i { width: 36px; height: 36px; }
-.bomb-btn b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.bomb-btn { position: absolute; right: 34px; top: 50%; width: 72px; height: 72px; margin-top: -46px; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 2px; color: #1d1305; background: linear-gradient(180deg, var(--fire-1), var(--fire-2)); box-shadow: 0 10px 30px rgba(255, 138, 31, 0.35), inset 0 -4px 0 rgba(0, 0, 0, 0.18); text-decoration: none; }
+.bomb-btn .i { width: 28px; height: 28px; }
+.bomb-btn b { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .t-cap { position: absolute; bottom: 16px; font-size: 11px; color: var(--dim); text-align: center; width: 170px; }
 .t-cap.l { left: 12px; }
 .t-cap.r { right: 12px; }

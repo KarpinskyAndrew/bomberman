@@ -129,7 +129,7 @@ The simulation is **pure and deterministic**: `State + []Command → State' + []
   9. Spawn aliens (portals).
   10. Advance sudden death.
   11. Check win conditions.
-- Entities live in **fixed-size arrays/slices** that are preallocated per match: grid `[21*21]Tile`, players `[4]Player`, aliens `[16]Alien`, bombs `[32]Bomb`, items `[64]Item`. Steady-state ticks therefore make **0 allocations**, which is enforced by `testing.AllocsPerRun` benchmarks.
+- Entities live in **fixed-size arrays/slices** that are preallocated per match: grid `[21*21]Tile` (sized for the largest arena; smaller arenas use the top-left `size × size` part and a `size` field, so the array never changes shape), players `[4]Player`, aliens `[16]Alien`, bombs `[32]Bomb`, items `[64]Item`. Steady-state ticks therefore make **0 allocations**, which is enforced by `testing.AllocsPerRun` benchmarks.
 - **What the client re-implements (the prediction subset):**
   - `canEnter(tile)`, `stepMovement(player, cmd)` (start/continue/turn/stop, 9 ticks per tile) and `canPlaceBomb(player, tile)`.
   - That is roughly 300 lines of TypeScript in `web/src/game/sim/`.
@@ -324,7 +324,7 @@ The client sends **one `CMD` per client tick (60 Hz)**. On WebSocket `count = 1`
 | Type | Name | Layout |
 |---|---|---|
 | `0x80` | `TICK` | `u32 tick`, `u32 ackSeq`, `u8 flags` (bit0 = has snapshot, bit1 = has events, bit2 = has private events), [`SNAPSHOT`], [`u32 firstEventSeq`, `u8 nEvents`, `EVENT`…], [`u16 firstPrivSeq`, `u8 nPriv`, `EVENT`…] |
-| `0x81` | `ROUND_START` | `u8 roundNo`, `u8 bestOf`, `u64 seed`, `u32 startTick`, `u8 config[16]`, `u8 grid[441]` (0 empty, 1 hard, 2 soft), `u8 nPlayers` + spawn slots. Sent at every round's COUNTDOWN, because each round has a new map. Tick and `eventSeq` keep counting across rounds. |
+| `0x81` | `ROUND_START` | `u8 roundNo`, `u8 bestOf`, `u64 seed`, `u32 startTick`, `u8 config[16]`, `u8 size` (15, 17 or 21), `u8 grid[size × size]` (0 empty, 1 hard, 2 soft; at most 441 bytes), `u8 nPlayers` + spawn slots. Sent at every round's COUNTDOWN, because each round has a new map. Tick and `eventSeq` keep counting across rounds. |
 | `0x82` | `FULL_STATE` | Sent on join or reconnect: grid + all bombs, fires, items, aliens, players + `tick` |
 | `0x83` | `PONG` | `u32 clientTimeMs` (echoed), `u32 serverTick`, `u16 serverHoldUs` |
 

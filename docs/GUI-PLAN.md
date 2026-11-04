@@ -12,7 +12,8 @@
 - Ranked is 1-vs-1 best-of-3 for registered players only; unrated is a single round for 2–4 players. Lobby, create modal, HUD and overlays updated.
 - The waiting room has no host Start button. A 15 s all-ready countdown starts the match and pauses when someone joins (§4.4).
 - The registration form asks for the password twice.
-- Touch controls: a floating virtual joystick and a bomb button (§7.1).
+- Touch controls: a floating virtual joystick and a bomb button (§7.1). A playable demo is at `mockups/game.html#touch`.
+- Arena size setting (Small 15 / Medium 17 / Large 21) in the Create Arena modal; Ranked is locked to Small.
 - Removed the "being hunted" warning on the own player card. The lock-on is shown on the alien itself.
 
 **Changes in 0.3:**
@@ -151,16 +152,18 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 │ Private       [ ]  → invite code on create │
 │ Max players   (•2 ) ( 3 ) ( 4 )   (locked) │
 │ ── Custom rules (Unrated only) ─────────── │
-│ Format        Best of 3   (follows mode)    │
+│ Format        Best of 3   (follows mode)   │
+│ Arena size    (•S 15) ( M 17 ) ( L 21 ) 🔒 │
 │ Wall density  ───────●────  65 %  (locked) │
 │ Wall drops    ────●───────  30 %  (locked) │
-│ Aliens        [✓]  Max ──●──── 4  (locked) │
+│ Aliens        [✓]  Max ──●──── 2  (locked) │
 │                        [Cancel] [Create]   │
 └────────────────────────────────────────────┘
 ```
 
 - Turning on **Private** switches the mode to **Unrated** and disables Ranked.
-- While Ranked is selected, max players is locked to 2 and the custom-rule controls are disabled and show the standard values (65 %, 30 %, 4 aliens).
+- While Ranked is selected, max players is locked to 2, the arena size to Small 15×15, and the custom-rule controls are disabled and show the standard values (65 %, 30 %, 2 aliens).
+- **Arena size** (Unrated): changing max players moves the size to its default (2 → Small, 3 → Medium, 4 → Large) and max aliens to that size's default, until the host picks a size by hand; after that, the host's choice sticks. Each option shows a tiny grid icon and its tile count.
 - The format is not a control: it follows the mode and is shown as text.
 - Guests do not see the Ranked option; the mode is fixed to Unrated.
 
@@ -177,7 +180,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 │  │ ✔ ready│ │ ✔ ready│ │ ✖      │ │        │                     │
 │  └────────┘ └────────┘ └────────┘ └────────┘                     │
 │  UNRATED · 1 round · 65 % walls · 30 % drops · Aliens: 4         │
-│  Map preview: (blurred mini-map of the 21×21 layout)             │
+│  Map preview: (blurred mini-map, e.g. Large 21×21)               │
 │  ⏸ Countdown paused: Kate joined, waiting for her to be ready    │
 │                     [ READY ✔ ]                                  │
 └──────────────────────────────────────────────────────────────────┘
@@ -439,7 +442,7 @@ export class EventDispatcher {
 
 ### 6.1 Scaling
 
-- Sprites are drawn at **16×16 px** per tile, so the arena is 21 × 16 = 336 px at 1×.
+- Sprites are drawn at **16×16 px** per tile, so the arena is 21 × 16 = 336 px at 1× on Large, 272 px on Medium and 240 px on Small. A smaller arena therefore gets a larger integer scale in the same space, which matters most on phones: Small fits 3× (720 px) where Large only fits 2×.
 - The renderer picks the largest **integer scale** that fits the available area: 2× = 672 px, 3× = 1008 px, 4× = 1344 px. It sets `imageSmoothingEnabled = false` and accounts for `devicePixelRatio` so pixels stay crisp.
 - Below a 2× fit (a very small window), it falls back to fractional scaling with smoothing off. On desktop it shows a "best at ≥ 1024×768" hint; on touch devices it doesn't, because a phone is a supported layout there (§7.1).
 
@@ -503,7 +506,7 @@ WASD hints make no sense on a phone, so touch devices get on-screen controls ins
 │ ⏱ 1:42  ●○ Andrew ❤❤❤  Kate ❤❤ ●○ ☰│   compact top bar replaces the side panels
 ├────────────────────────────────────┤
 │                                    │
-│        21 × 21 ARENA CANVAS        │   fills the width
+│     ARENA CANVAS (15×15 duel)      │   fills the width
 │                                    │
 ├────────────────────────────────────┤
 │    ╭─────╮                  ╭───╮  │
@@ -516,11 +519,12 @@ WASD hints make no sense on a phone, so touch devices get on-screen controls ins
 - **When:** `matchMedia('(pointer: coarse)')` is true, or the player turns it on in Settings ("Touch controls: Auto / On / Off"). Keyboard hints are hidden in touch mode.
 - **Virtual joystick (left):**
   - **Floating:** the base circle appears where the thumb first touches anywhere in the left half of the control area, so the player never has to find it. It fades out on release.
-  - The thumb knob follows the finger, clamped to the base radius (≈ 60 px).
+  - Sizes (default "M"): a **96 px** base circle with a 44 px knob that travels at most **38 px** from the centre. Small enough to leave the arena and HUD room on a phone, big enough for a thumb.
+  - The thumb knob follows the finger, clamped to that travel.
   - The offset is snapped to the **nearest of 4 directions** (movement is tile-by-tile). A **dead zone** of 25 % of the radius means "no direction".
   - **Hysteresis:** switching between two directions needs the angle to cross the 45° line by 10° extra, so a thumb resting on a diagonal doesn't flicker between them.
   - It feeds the same held-direction logic as the keyboard (`InputSystem.setDirection(dir | null)`), so prediction and the server see identical commands.
-- **Bomb button (right):** a large round button (≥ 72 px, thumb-reachable bottom-right). Edge-triggered on `pointerdown`, like SPACE. It shows the bomb count (`1/2`) and greys out when no bomb is available.
+- **Bomb button (right):** a round button, **72 px** (the smallest comfortable size for a fast repeated tap), thumb-reachable bottom-right. Edge-triggered on `pointerdown`, like SPACE. It shows the bomb count (`1/2`) and greys out when no bomb is available.
 - **Menu:** the ☰ button in the top bar replaces ESC.
 - **Implementation:**
   - Pointer Events with `setPointerCapture`, so each control tracks its own finger (multi-touch: walk and bomb at the same time).

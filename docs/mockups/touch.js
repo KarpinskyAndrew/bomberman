@@ -9,26 +9,27 @@
   const canvas = document.getElementById('touch-arena');
   if (!root || !canvas || !window.Arena) return;
 
-  const C = Arena.COLORS, N = Arena.N;
+  const C = Arena.COLORS;
+  const SIZE = 15;             // ranked 1v1 arena: Small 15x15 (SPEC §4.1)
   const STEP = 0.22;          // seconds per tile, player
   const ALIEN_STEP = 0.5;     // seconds per tile, drifter
   const FUSE = 3, FIRE_TIME = 0.5, INVULN = 1.5;
-  const KNOB_MAX = 50;        // px the knob may travel from the base centre
+  const KNOB_MAX = 38;        // px the knob may travel from the base centre
   const DEAD = 0.25;          // dead zone, fraction of KNOB_MAX
   const HYST = 10;            // extra degrees needed to switch direction
   const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
   const OPP = { u: 'd', d: 'u', l: 'r', r: 'l' };
 
-  const START = { x: 7, y: 9 }, KATE = { x: 13, y: 13 }, ALIEN_START = { x: 15, y: 5 };
+  const START = { x: 5, y: 7 }, KATE = { x: 9, y: 9 }, ALIEN_START = { x: 11, y: 3 };
   const scene = {
-    seed: 23, density: 0.62, names: true,
+    seed: 23, density: 0.62, names: true, size: SIZE,
     players: [{ x: START.x, y: START.y, color: C.p1, name: 'Andrew', dir: 'r' },
               { x: KATE.x, y: KATE.y, color: C.p3, name: 'Kate', dir: 'l' }],
     aliens: [{ type: 'drifter', x: ALIEN_START.x, y: ALIEN_START.y }],
     bombs: [],
-    items: [{ x: 11, y: 9, kind: 'fire' }, { x: 9, y: 13, kind: 'bomb' }],
-    clear: [[5, 9], [6, 9], [8, 9], [9, 9], [10, 9], [7, 8], [7, 10], [7, 11], [12, 13], [14, 13], [13, 12], [13, 14],
-            [14, 5], [16, 5], [15, 4], [15, 6]]
+    items: [{ x: 7, y: 7, kind: 'fire' }, { x: 5, y: 11, kind: 'bomb' }],
+    clear: [[3, 7], [4, 7], [6, 7], [5, 6], [5, 8], [5, 9], [8, 9], [10, 9], [9, 8], [9, 10],
+            [10, 3], [12, 3], [11, 4], [11, 5]]
   };
   const view = Arena.mount(canvas, scene);
   const map = scene._map;
@@ -62,7 +63,7 @@
   function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* not allowed here */ } }
 
   /* ---------- rules (simplified) ---------- */
-  const inside = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+  const inside = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE;
   const bombAt = (x, y) => scene.bombs.some(b => b.x === x && b.y === y);
   const canEnter = (x, y) => inside(x, y) && map[y][x] === 0 && !bombAt(x, y);
   const tileOf = o => o.m && o.prog >= 0.5 ? { x: o.tx + DIRS[o.m][0], y: o.ty + DIRS[o.m][1] } : { x: o.tx, y: o.ty };

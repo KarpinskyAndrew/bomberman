@@ -23,8 +23,7 @@
 (function () {
   'use strict';
 
-  const N = 21;
-  const SPAWNS = [[1, 1], [19, 1], [1, 19], [19, 19]];
+  const N = 21;               // default size; a scene may set size: 15 | 17 | 21 (SPEC §4.1)
   const COLORS = { p1: '#4da3ff', p2: '#ff9a3c', p3: '#47d16c', p4: '#e46bd6' };
   const PAL = {
     floorA: '#171e30', floorB: '#1a2236',
@@ -45,14 +44,14 @@
     };
   }
 
-  function isHard(x, y) {
-    return x === 0 || y === 0 || x === N - 1 || y === N - 1 || (x % 2 === 0 && y % 2 === 0);
+  function isHard(x, y, n) {
+    return x === 0 || y === 0 || x === n - 1 || y === n - 1 || (x % 2 === 0 && y % 2 === 0);
   }
 
-  function genMap(seed, density) {
+  function genMap(seed, density, n) {
     const r = rng(seed);
     const safe = new Set();
-    for (const [sx, sy] of SPAWNS) {
+    for (const [sx, sy] of [[1, 1], [n - 2, 1], [1, n - 2], [n - 2, n - 2]]) {
       const dx = sx === 1 ? 1 : -1;
       const dy = sy === 1 ? 1 : -1;
       safe.add(sx + ',' + sy);
@@ -60,10 +59,10 @@
       safe.add(sx + ',' + (sy + dy));
     }
     const map = [];
-    for (let y = 0; y < N; y++) {
+    for (let y = 0; y < n; y++) {
       const row = [];
-      for (let x = 0; x < N; x++) {
-        if (isHard(x, y)) row.push(2);
+      for (let x = 0; x < n; x++) {
+        if (isHard(x, y, n)) row.push(2);
         else if (safe.has(x + ',' + y)) row.push(0);
         else row.push(r() < density ? 1 : 0);
       }
@@ -79,7 +78,7 @@
       for (let i = 1; i <= b.range; i++) {
         const x = b.x + dx * i;
         const y = b.y + dy * i;
-        if (x < 0 || y < 0 || x >= N || y >= N || map[y][x] === 2) break;
+        if (x < 0 || y < 0 || x >= map.length || y >= map.length || map[y][x] === 2) break;
         if (map[y][x] === 1) { out.push({ x, y, dir, burning: true }); break; }
         out.push({ x, y, dir });
       }
@@ -88,7 +87,8 @@
   }
 
   function prepare(scene) {
-    const map = genMap(scene.seed || 7, scene.density == null ? 0.65 : scene.density);
+    scene._n = scene.size || N;
+    const map = genMap(scene.seed || 7, scene.density == null ? 0.65 : scene.density, scene._n);
     const clear = (x, y) => { if (map[y] && map[y][x] === 1) map[y][x] = 0; };
     (scene.players || []).forEach(p => clear(p.x, p.y));
     (scene.aliens || []).forEach(a => clear(a.x, a.y));
@@ -374,14 +374,14 @@
     const t = canvas._t;
     if (!t) return;
     ctx.imageSmoothingEnabled = false;
-    const map = scene._map;
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
+    const map = scene._map, n = scene._n;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
         if (map[y][x] === 2) drawHard(ctx, x, y, t);
         else drawFloor(ctx, x, y, t, map);
       }
     }
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (map[y][x] === 1) drawSoft(ctx, x, y, t);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (map[y][x] === 1) drawSoft(ctx, x, y, t);
 
     (scene.danger || []).forEach(([x, y]) => {
       ctx.fillStyle = 'rgba(255,40,50,.16)';
@@ -423,11 +423,12 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const side = scene.cover ? Math.max(box.width, box.height) : Math.min(box.width, box.height);
     const zoom = scene.zoom || 1;
-    const t = Math.max(2, scene.cover ? Math.ceil((side * dpr * zoom) / N) : Math.floor((side * dpr * zoom) / N));
-    if (canvas._t === t) return;
+    const t = Math.max(2, scene.cover ? Math.ceil((side * dpr * zoom) / scene._n) : Math.floor((side * dpr * zoom) / scene._n));
+    if (canvas._t === t && canvas._n === scene._n) return;
+    canvas._n = scene._n;
     canvas._t = t;
-    canvas.width = canvas.height = t * N;
-    canvas.style.width = canvas.style.height = (t * N) / dpr + 'px';
+    canvas.width = canvas.height = t * scene._n;
+    canvas.style.width = canvas.style.height = (t * scene._n) / dpr + 'px';
   }
 
   function mount(canvas, initial) {
