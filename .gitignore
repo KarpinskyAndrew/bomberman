@@ -1,2 +1,21 @@
 *.env
 !*.env.example
+
+# Go build output
+*.exe
+*.test
+*.out
+/server/bin/
+
+# Terraform (repo is public — never commit state or real tfvars)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
