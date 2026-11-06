@@ -34,20 +34,35 @@
 <main class="page">
   <div class="room">
     <div class="stack">
+      <!-- Private only: the invite code, front and centre. The server creates it with the arena. -->
+      <section class="panel invite on-private" aria-labelledby="inv-t">
+        <div class="invite-main">
+          <span class="invite-lbl" id="inv-t"><svg class="i"><use href="#i-lock"/></svg> Invite code</span>
+          <b class="invite-code" aria-label="K 7 M 2 Q X">K7M2QX</b>
+        </div>
+        <div class="invite-actions">
+          <button type="button" class="btn btn-primary" data-copy="K7M2QX"><svg class="i"><use href="#i-copy"/></svg> <span>Copy code</span></button>
+          <button type="button" class="btn" data-copy="https://bomberman.space/arena/a1b2c3?code=K7M2QX"><svg class="i"><use href="#i-link"/></svg> <span>Copy invite link</span></button>
+        </div>
+        <p class="hint invite-help">Send the link (it joins directly), or tell them the code to enter in <b>Lobby → Join by code</b>. Only people with the code can join. Guests are welcome, so no account is needed.</p>
+      </section>
+
       <!-- Unrated: up to 4 slots -->
       <section class="slot-grid not-ranked" aria-label="Players">
         <div class="slot me" style="--pc:var(--p1)">
           <span class="avatar">A</span>
           <span class="nm">Andrew</span>
           <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span><span class="tier tier-gold num" style="font-size:13px">1342</span></span>
-          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
         </div>
         <div class="slot me-nonhost" style="--pc:var(--p2)">
           <a class="icon-btn kick host-only" href="#" aria-label="Remove Guest-4821" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
           <span class="avatar">G</span>
           <span class="nm">Guest-4821</span>
           <span class="tags"><span class="badge badge-guest">Guest</span></span>
-          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
         </div>
         <div class="slot" style="--pc:var(--p4)">
           <a class="icon-btn kick host-only" href="#" aria-label="Remove mira" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
@@ -60,7 +75,7 @@
         <div class="slot empty no-paused" style="--pc:#2b3247">
           <span class="avatar"><svg class="i"><use href="#i-plus"/></svg></span>
           <span class="nm dim">Open slot</span>
-          <span class="tags"></span>
+          <span class="tags"><span class="dim on-private" style="font-size:12px">Share code <b class="num">K7M2QX</b></span></span>
           <span class="state not">Waiting<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
         </div>
         <div class="slot newcomer on-paused" style="--pc:var(--p3)">
@@ -80,7 +95,8 @@
           <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span></span>
           <span class="tier tier-gold">Gold · <span class="num">1342</span></span>
           <span class="dim num" style="font-size:12px">#87 · 30 rated matches</span>
-          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
         </div>
         <span class="vs" aria-hidden="true">VS</span>
         <div class="slot" style="--pc:var(--p3)">
@@ -133,11 +149,18 @@
           <span class="ring run" style="--p:60"><b>9</b></span>
           <span class="txt"><span class="display">Starting in 9</span><span>Both players are ready. The arena is full; un-ready to pause.</span></span>
         </div>
-
-        <div class="room-actions" style="padding:6px 0 0">
-          <a class="btn btn-lg btn-ok" href="#" aria-pressed="true"><svg class="i"><use href="#i-check"/></svg> Ready</a>
+        <!-- Shown in every state once you un-ready: the countdown can't run without you -->
+        <div class="ready-box you-wait" aria-live="polite">
+          <span class="ring grey" style="--p:100"><svg class="i"><use href="#i-pause"/></svg></span>
+          <span class="txt"><b>Waiting for you</b><span>The 15 s countdown runs only while everyone is ready, you included.</span></span>
         </div>
-        <p class="hint" style="text-align:center">You're ready. Press again to un-ready.</p>
+
+        <!-- Toggle button: the label stays "Ready"; aria-pressed and the style show the state -->
+        <div class="room-actions" style="padding:6px 0 0">
+          <button type="button" class="btn btn-lg ready-toggle" id="ready-toggle" aria-pressed="true"><svg class="i"><use href="#i-check"/></svg> Ready</button>
+        </div>
+        <p class="hint you-ready" style="text-align:center">You're ready. Press again to un-ready.</p>
+        <p class="hint you-unready" style="text-align:center">You're not ready. Press Ready when you're set.</p>
       </section>
     </div>
 
@@ -166,6 +189,24 @@
   const sizeFor = h => (h === 'ranked' ? 15 : h === 'private' ? 17 : 21);
   const preview = Arena.mount(document.getElementById('preview'), { seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) });
   window.addEventListener('hashchange', () => preview.update({ seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) }));
+
+  // Ready toggle. You start ready in every state; switching state resets it.
+  const readyBtn = document.getElementById('ready-toggle');
+  const setReady = on => {
+    readyBtn.setAttribute('aria-pressed', String(on));
+    document.body.classList.toggle('me-unready', !on);
+  };
+  readyBtn.addEventListener('click', () => setReady(readyBtn.getAttribute('aria-pressed') !== 'true'));
+  window.addEventListener('hashchange', () => setReady(true));
+
+  // Copy buttons: copy the value and show "Copied" for 1.5 s.
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy); } catch { /* clipboard may be blocked on file://; the mockup still shows the feedback */ }
+    const lbl = btn.querySelector('span');
+    const was = lbl.textContent;
+    lbl.textContent = 'Copied';
+    setTimeout(() => { lbl.textContent = was; }, 1500);
+  }));
 </script>
 </body>
 </html>

@@ -162,6 +162,7 @@ img, svg, canvas { display: block; }
 .chip .i { width: 14px; height: 14px; }
 .chip.hot { color: var(--fire-1); border-color: rgba(255, 221, 85, 0.35); }
 .locked { opacity: 0.45; }
+.field:not(.locked) .lock-ico { display: none; }
 
 /* Player slots dots (●●●○) */
 .slots { display: inline-flex; gap: 3px; vertical-align: middle; }
@@ -411,6 +412,18 @@ body:has(#as-guest:target, #quickplay-guest:target, #create-guest:target, #ranke
 .room-bar .title b { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .code-pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border-radius: 10px; border: 1px dashed var(--edge-strong); font-size: 13px; color: var(--muted); }
 .code-pill b { font: 400 15px var(--font-display); letter-spacing: 0.12em; color: var(--ink); }
+
+/* Private room: big invite panel above the player slots */
+.invite { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px 20px; padding: 18px 20px; border: 1px dashed rgba(255, 176, 46, 0.5); background: rgba(255, 176, 46, 0.05); }
+.invite-main { display: grid; gap: 4px; min-width: 0; }
+.invite-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.invite-code { font: 400 clamp(30px, 6vw, 42px) var(--font-display); letter-spacing: 0.18em; color: var(--fire-1); line-height: 1.1; user-select: all; }
+.invite-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.invite-help { grid-column: 1 / -1; font-size: 13px; }
+@media (max-width: 640px) {
+  .invite { grid-template-columns: 1fr; }
+  .invite-actions .btn { flex: 1; }
+}
 .room { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
 .slot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .slot {
@@ -478,6 +491,24 @@ body:has(#not-host:target) .host-only,
 body:not(:has(#not-host:target)) .on-nonhost { display: none; }
 body:has(#not-host:target) .slot.me { border-color: var(--edge); box-shadow: none; }
 body:has(#not-host:target) .slot.me-nonhost { border-color: color-mix(in srgb, var(--pc) 60%, transparent); box-shadow: 0 0 30px color-mix(in srgb, var(--pc) 15%, transparent); }
+
+/* Ready toggle. Pressed = green "you're ready"; not pressed = orange call to action. */
+.ready-toggle[aria-pressed="true"] { background: rgba(71, 209, 108, 0.18); border-color: rgba(71, 209, 108, 0.6); color: #c9f5d5; box-shadow: 0 0 24px rgba(71, 209, 108, 0.2); }
+.ready-toggle[aria-pressed="true"]:hover { background: rgba(71, 209, 108, 0.26); border-color: rgba(71, 209, 108, 0.8); }
+.ready-toggle[aria-pressed="false"] { background: linear-gradient(180deg, var(--fire-1), var(--fire-2)); color: #1d1305; border-color: transparent; box-shadow: 0 8px 24px rgba(255, 138, 31, 0.25); }
+.ready-toggle[aria-pressed="false"]:hover { background: linear-gradient(180deg, #ffe57a, #ff9a3c); }
+.ready-toggle[aria-pressed="false"] .i { display: none; }
+
+/* Your own ready state ("you" = Andrew by default, Guest-4821 in #not-host). Toggled by body.me-unready. */
+.hint.you-unready, .slot .state.you-unready, .ready-box.you-wait { display: none; }
+body.me-unready .hint.you-ready,
+body.me-unready .ready-box:not(.you-wait),
+body.me-unready:not(:has(#not-host:target)) .slot.me .you-ready,
+body.me-unready:has(#not-host:target) .slot.me-nonhost .you-ready { display: none; }
+body.me-unready .hint.you-unready { display: block; }
+body.me-unready .ready-box.you-wait { display: flex; }
+body.me-unready:not(:has(#not-host:target)) .slot.me .you-unready,
+body.me-unready:has(#not-host:target) .slot.me-nonhost .you-unready { display: inline-flex; }
 
 /* =====================================================================
    In-game
