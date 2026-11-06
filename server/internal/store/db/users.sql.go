@@ -9,7 +9,17 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createPlayerRating = `-- name: CreatePlayerRating :exec
+INSERT INTO player_ratings (user_id) VALUES ($1)
+`
+
+func (q *Queries) CreatePlayerRating(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, createPlayerRating, userID)
+	return err
+}
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, email)
@@ -49,6 +59,43 @@ type CreateUserCredentialsParams struct {
 func (q *Queries) CreateUserCredentials(ctx context.Context, arg CreateUserCredentialsParams) error {
 	_, err := q.db.Exec(ctx, createUserCredentials, arg.UserID, arg.PasswordHash)
 	return err
+}
+
+const createUserStats = `-- name: CreateUserStats :exec
+INSERT INTO user_stats (user_id) VALUES ($1)
+`
+
+func (q *Queries) CreateUserStats(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, createUserStats, userID)
+	return err
+}
+
+const getCredentialsByUsername = `-- name: GetCredentialsByUsername :one
+SELECT u.id, u.username, u.email, u.created_at, c.password_hash
+FROM users u
+JOIN user_credentials c ON c.user_id = u.id
+WHERE u.username = $1
+`
+
+type GetCredentialsByUsernameRow struct {
+	ID           uuid.UUID
+	Username     string
+	Email        string
+	CreatedAt    pgtype.Timestamptz
+	PasswordHash string
+}
+
+func (q *Queries) GetCredentialsByUsername(ctx context.Context, username string) (GetCredentialsByUsernameRow, error) {
+	row := q.db.QueryRow(ctx, getCredentialsByUsername, username)
+	var i GetCredentialsByUsernameRow
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.Email,
+		&i.CreatedAt,
+		&i.PasswordHash,
+	)
+	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
