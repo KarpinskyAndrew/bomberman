@@ -747,4 +747,4 @@ Defaults are proposed above. Please confirm or change them:
 
 **Still open:**
 
-1. **License** for the public source, the domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions).
+1. The domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions). (The license is decided: Business Source License 1.1, see `LICENSE`.)
