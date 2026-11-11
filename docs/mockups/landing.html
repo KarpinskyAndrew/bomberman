@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Landing · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="mockups.css">
+<link rel="stylesheet" href="mockups-modern.css">
+</head>
+<body class="landing" data-states="guest|Guest nickname;login|Log in;register|Register;register-mismatch|Register (passwords differ);register-error|Register (server errors)">
+
+<div class="bg-fixed arena-host"><canvas id="bg" aria-hidden="true"></canvas></div>
+<div class="bg-shade" aria-hidden="true"></div>
+
+<header class="landing-top">
+  <a class="brand" href="landing.html">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="19" r="10" fill="#1b2133" stroke="#2c3550" stroke-width="1.5"/><circle cx="10.5" cy="15.5" r="3" fill="#fff" opacity=".3"/><path d="M20 11q3-5 7-4" stroke="#c9a46a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="27.5" cy="6.5" r="3" fill="#ffb02e"/></svg>
+    <span>BomberMan <b>Online</b></span>
+  </a>
+  <nav class="nav"><a href="leaderboard.html"><svg class="i"><use href="#i-trophy"/></svg> <span>Leaderboard</span></a></nav>
+</header>
+
+<main class="landing-main">
+  <div class="hero">
+    <svg class="hero-bomb" viewBox="0 0 84 84" aria-hidden="true">
+      <g class="body">
+        <circle cx="38" cy="50" r="27" fill="#1b2133"/>
+        <circle cx="38" cy="50" r="27" fill="none" stroke="#2c3550" stroke-width="2"/>
+        <circle cx="29" cy="41" r="7" fill="#fff" opacity=".22"/>
+        <rect x="46" y="20" width="12" height="9" rx="2" fill="#3b4462" transform="rotate(35 52 24)"/>
+      </g>
+      <path d="M55 22q6-10 12-8" stroke="#c9a46a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <g class="spark"><circle cx="66" cy="14" r="6" fill="#ffdd55"/><circle cx="66" cy="14" r="3" fill="#fff6d0"/></g>
+    </svg>
+    <h1 class="hero-title">BomberMan<small>ONLINE</small></h1>
+    <p class="lede">Real-time arena battles with aliens on the loose. Ranked 1v1 duels, best of 3, or free-for-all rounds for up to 4 players.</p>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="#guest"><svg class="i"><use href="#i-play"/></svg> Play as guest</a>
+      <div class="pair">
+        <a class="btn btn-lg" href="#login">Log in</a>
+        <a class="btn btn-lg" href="#register">Register</a>
+      </div>
+    </div>
+    <p class="live num">412 players online · 97 arenas running</p>
+  </div>
+</main>
+
+<ul class="how">
+  <li><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span> or arrows to move</li>
+  <li><span class="kbd">Space</span> to drop a bomb</li>
+  <li><svg class="i"><use href="#i-play"/></svg> Joystick and bomb button on phones</li>
+  <li><svg class="i" style="color:var(--fire-1)"><use href="#i-trophy"/></svg> Last one standing wins</li>
+  <li><svg class="i" style="color:var(--bad)"><use href="#i-alien"/></svg> Aliens kill on touch</li>
+</ul>
+
+<!-- Guest nickname -->
+<div class="modal" id="guest" role="dialog" aria-modal="true" aria-labelledby="guest-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="guest-t">Play as guest</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="label" for="nick">Nickname <span class="dim">(optional)</span></label>
+        <input class="input" id="nick" placeholder="Guest-4821" maxlength="16">
+        <span class="hint">Leave it empty and we'll pick one. 3–16 letters, digits or _.</span>
+      </div>
+      <div class="alert"><svg class="i"><use href="#i-info"/></svg><span>Guests can join and create Unrated arenas. Ranked 1v1 needs an account, and guest stats aren't saved.</span></div>
+    </div>
+    <div class="modal-foot">
+      <a class="btn btn-ghost left" href="#register">Register instead</a>
+      <a class="btn btn-primary" href="lobby.html#as-guest"><svg class="i"><use href="#i-play"/></svg> Play</a>
+    </div>
+  </div>
+</div>
+
+<!-- Log in -->
+<div class="modal" id="login" role="dialog" aria-modal="true" aria-labelledby="login-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="login-t">Log in</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="lu">Username or email</label><input class="input" id="lu" value="Andrew" autocomplete="username"></div>
+      <div class="field"><label class="label" for="lp">Password</label><input class="input" id="lp" type="password" value="hunter22hunter" autocomplete="current-password"></div>
+      <label class="check"><input type="checkbox" checked> Keep me logged in</label>
+    </div>
+    <div class="modal-foot">
+      <span class="left muted" style="font-size:13px">No account? <a href="#register">Register</a></span>
+      <a class="btn btn-primary" href="lobby.html">Log in</a>
+    </div>
+  </div>
+</div>
+
+<!-- Register -->
+<div class="modal" id="register" role="dialog" aria-modal="true" aria-labelledby="reg-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="reg-t">Create account</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="ru">Username</label><input class="input" id="ru" placeholder="blastqueen"><span class="hint">3–16 characters: letters, digits and _. This is your public name.</span></div>
+      <div class="field"><label class="label" for="re">Email</label><input class="input" id="re" type="email" placeholder="you@example.com"><span class="hint">Only used to log in. Never shown to other players.</span></div>
+      <div class="field"><label class="label" for="rp">Password</label><input class="input" id="rp" type="password" placeholder="At least 8 characters" autocomplete="new-password"></div>
+      <div class="field"><label class="label" for="rp-c">Confirm password</label><input class="input" id="rp-c" type="password" placeholder="Type it again" autocomplete="new-password"><span class="hint">Checked here before sending, to catch typos.</span></div>
+      <div class="alert warn"><svg class="i"><use href="#i-star"/></svg><span>Registered players can play Ranked 1v1 and get an ELO rating, a profile and a spot on the leaderboard.</span></div>
+    </div>
+    <div class="modal-foot">
+      <span class="left muted" style="font-size:13px">Have an account? <a href="#login">Log in</a></span>
+      <a class="btn btn-primary" href="#register-mismatch">Create account</a>
+    </div>
+  </div>
+</div>
+
+<!-- Register: the two passwords differ (client-side check, submit stays disabled) -->
+<div class="modal" id="register-mismatch" role="dialog" aria-modal="true" aria-labelledby="regm-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="regm-t">Create account</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="ru3">Username</label><input class="input" id="ru3" value="blastqueen"><span class="hint">3–16 characters: letters, digits and _. This is your public name.</span></div>
+      <div class="field"><label class="label" for="re3">Email</label><input class="input" id="re3" type="email" value="queen@example.com"><span class="hint">Only used to log in. Never shown to other players.</span></div>
+      <div class="field"><label class="label" for="rp3">Password</label><input class="input" id="rp3" type="password" value="kaboom2026!" autocomplete="new-password"><span class="hint ok">At least 8 characters</span></div>
+      <div class="field"><label class="label" for="rp3-c">Confirm password</label><input class="input invalid" id="rp3-c" type="password" value="kaboom2062!" aria-invalid="true" autocomplete="new-password"><span class="hint err">The passwords don't match.</span></div>
+    </div>
+    <div class="modal-foot">
+      <span class="left muted" style="font-size:13px">Have an account? <a href="#login">Log in</a></span>
+      <a class="btn btn-primary" href="#register-error" aria-disabled="true" title="Both passwords must match">Create account</a>
+    </div>
+  </div>
+</div>
+
+<!-- Register with validation errors -->
+<div class="modal" id="register-error" role="dialog" aria-modal="true" aria-labelledby="rege-t">
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="rege-t">Create account</h2><a class="icon-btn" href="#" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></a></div>
+    <div class="modal-body">
+      <div class="field"><label class="label" for="ru2">Username</label><input class="input invalid" id="ru2" value="kaboom_kid" aria-invalid="true"><span class="hint err">This username is already taken.</span></div>
+      <div class="field"><label class="label" for="re2">Email</label><input class="input invalid" id="re2" value="andrew@" aria-invalid="true"><span class="hint err">Enter a valid email address.</span></div>
+      <div class="field"><label class="label" for="rp2">Password</label><input class="input invalid" id="rp2" type="password" value="short" aria-invalid="true"><span class="hint err">Use at least 8 characters.</span></div>
+      <div class="field"><label class="label" for="rp2-c">Confirm password</label><input class="input" id="rp2-c" type="password" value="short"><span class="hint ok">Passwords match</span></div>
+    </div>
+    <div class="modal-foot">
+      <span class="left muted" style="font-size:13px">Have an account? <a href="#login">Log in</a></span>
+      <a class="btn btn-primary" href="#register-error">Create account</a>
+    </div>
+  </div>
+</div>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  const C = Arena.COLORS;
+  Arena.mount(document.getElementById('bg'), {
+    seed: 11, density: 0.6, cover: true,
+    players: [
+      { x: 3, y: 1, color: C.p1, dir: 'r' }, { x: 17, y: 5, color: C.p2, dir: 'l' },
+      { x: 1, y: 15, color: C.p3 }, { x: 13, y: 19, color: C.p4, dir: 'l' }
+    ],
+    aliens: [{ type: 'drifter', x: 9, y: 7 }, { type: 'seeker', x: 11, y: 13 }, { type: 'brute', x: 15, y: 11 }],
+    bombs: [{ x: 5, y: 3 }, { x: 15, y: 17 }],
+    fires: [{ x: 7, y: 15, range: 3 }],
+    items: [{ x: 13, y: 3, kind: 'fire' }, { x: 3, y: 9, kind: 'health' }, { x: 19, y: 13, kind: 'bomb' }]
+  });
+</script>
+</body>
+</html>

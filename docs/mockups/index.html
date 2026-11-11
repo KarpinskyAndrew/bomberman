@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screen mockups · BomberMan Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="mockups.css">
+<link rel="stylesheet" href="mockups-modern.css">
+</head>
+<body>
+<main class="page">
+  <header class="cat-head">
+    <a class="brand" href="landing.html">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="14" cy="19" r="10" fill="#1b2133" stroke="#2c3550" stroke-width="1.5"/><circle cx="10.5" cy="15.5" r="3" fill="#fff" opacity=".3"/><path d="M20 11q3-5 7-4" stroke="#c9a46a" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="27.5" cy="6.5" r="3" fill="#ffb02e"/></svg>
+      <span>BomberMan <b>Online</b></span>
+    </a>
+    <h1 class="page-title">Screen mockups</h1>
+    <p>Static HTML layouts for every screen in <code>docs/GUI-PLAN.md</code> §3–4. They are design references, not the Vue app: no backend, fake data, and links that only move between mockups. Open a screen, then use the <b>Mockups</b> button in the bottom-right corner to switch screens and states (modals, overlays, guest view…). Each state also has its own URL hash, listed under the cards.</p>
+  </header>
+
+  <section aria-labelledby="designs-t">
+    <h2 id="designs-t" style="font-size:16px;margin-top:22px">Two designs, same screens</h2>
+    <div class="designs">
+      <button type="button" class="design-card" data-theme-set="retro" aria-pressed="true">
+        <span class="top"><span class="tag">v1</span><b>Retro</b><span class="on">Showing</span></span>
+        <span class="sample retro" aria-hidden="true">BomberMan</span>
+        <p>Chunky Bungee titles, solid panels and a pixel-art arena.</p>
+      </button>
+      <button type="button" class="design-card" data-theme-set="modern" aria-pressed="false">
+        <span class="top"><span class="tag">v2</span><b>Modern</b><span class="on">Showing</span></span>
+        <span class="sample modern" aria-hidden="true">BomberMan</span>
+        <p>The look of bomberman.space: glass panels, Inter, fire gradients and a glowing vector arena.</p>
+      </button>
+    </div>
+    <p class="hint" style="margin-top:10px">Every screen has the same <b>Retro / Modern</b> switch in the bottom-right corner. The choice is remembered across pages. To link to one design, add <code>?theme=retro</code> or <code>?theme=modern</code> to the URL, for example <a href="lobby.html?theme=modern">lobby.html?theme=modern</a>.</p>
+  </section>
+
+  <section class="cat-grid" id="grid"></section>
+
+  <h2 style="font-size:16px;margin-top:36px">Design tokens</h2>
+  <div class="palette" id="palette"></div>
+</main>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  const SCREENS = [
+    ['landing.html', 'Landing', '/', 'Animated arena background, play as guest in two clicks, log in, and register with a confirmed password.',
+      [['guest', 'Guest nickname'], ['login', 'Log in'], ['register', 'Register'], ['register-mismatch', 'Passwords differ'], ['register-error', 'Server errors']]],
+    ['lobby.html', 'Lobby', '/lobby', 'Quick Play (Ranked 1v1, or unrated for guests), create or join an arena, live arena list with Opp ★ rating, own stats. Guests see Ranked rows locked.',
+      [['quickplay', 'Quick Play'], ['create', 'Create (ranked 1v1)'], ['create-private', 'Create (private)'], ['join', 'Join by code'], ['join-error', 'Wrong code'], ['settings', 'Settings'], ['as-guest', 'As guest'], ['quickplay-guest', 'Guest Quick Play'], ['create-guest', 'Guest create'], ['ranked-locked', 'Register to play Ranked']]],
+    ['waiting-room.html', 'Waiting room', '/arena/:id', 'Player slots, ready states, the rules, a blurred map preview and the 15 s all-ready countdown (no Start button). Default: not everyone is ready.',
+      [['countdown', 'Starting in 12'], ['paused', 'Paused: Kate joined'], ['ranked', 'Ranked 1v1'], ['private', 'Private + code'], ['not-host', 'Non-host']]],
+    ['game.html', 'In-game', '/arena/:id', 'HUD around the 21×21 canvas. Default: an unrated 4-player round (no pips). Countdown and round end: a ranked 1v1 best of 3. Plus the phone layout with joystick and bomb button.',
+      [['sudden', 'Sudden death'], ['hit', 'Hit'], ['eaten', 'Eaten'], ['spectating', 'Spectating'], ['esc', 'ESC menu'], ['version', 'New version'], ['countdown', 'Ranked countdown'], ['round-end', 'Ranked round end'], ['touch', 'Touch (phone)']]],
+    ['results.html', 'Match results', '/arena/:id', 'Ranked 1v1: per-round results, wins, points and rating deltas. Unrated: one round, placement and how each player went out. Then back to the waiting room.',
+      [['pending', 'Rating pending'], ['draw', 'Ranked draw'], ['unrated', 'Unrated']]],
+    ['profile.html', 'Profile', '/profile/:username', 'Tier, rating, rank, stats, rating history chart and match history: ranked duels with round score and delta, unrated rounds with placement.',
+      [['placement', 'Placement']]],
+    ['leaderboard.html', 'Leaderboard', '/leaderboard', 'Ranked 1v1 ratings: top 3 podium, 25 rows per page, own row pinned at the bottom.', []],
+    ['not-found.html', 'Not found', '/:pathMatch(.*)', 'The 404 page.', []]
+  ];
+  // Thumbnails follow the theme: through localStorage when it works, otherwise through ?theme=.
+  const thumbSrc = file => MockTheme.canStore() ? file : `${file}?theme=${MockTheme.get()}`;
+  document.getElementById('grid').innerHTML = SCREENS.map(([file, title, route, desc, states]) => `
+    <article class="cat-card">
+      <a class="thumb" href="${file}" aria-label="Open ${title}"><iframe src="${thumbSrc(file)}" data-file="${file}" loading="lazy" tabindex="-1" aria-hidden="true" title="${title} preview"></iframe></a>
+      <div class="cat-body">
+        <h2><a href="${file}">${title}</a><code>${route}</code></h2>
+        <p>${desc}</p>
+        ${states.length ? `<div class="cat-states">${states.map(([id, l]) => `<a href="${file}#${id}">${l}</a>`).join('')}</div>` : ''}
+      </div>
+    </article>`).join('');
+
+  const scale = () => document.querySelectorAll('.thumb').forEach(t => {
+    t.querySelector('iframe').style.transform = `scale(${t.clientWidth / 1440})`;
+  });
+  new ResizeObserver(scale).observe(document.getElementById('grid'));
+  scale();
+
+  const tokens = ['--bg', '--surface', '--surface-2', '--ink', '--muted', '--fire-1', '--fire-2', '--fire-3', '--ok', '--bad',
+    '--p1', '--p2', '--p3', '--p4', '--t-bronze', '--t-silver', '--t-gold', '--t-platinum', '--t-diamond',
+    '--a-drifter', '--a-seeker', '--a-brute'];
+  const palette = () => {
+    const cs = getComputedStyle(document.documentElement);
+    document.getElementById('palette').innerHTML = tokens.map(t =>
+      `<span><i style="background:var(${t})"></i><code>${t}</code> ${cs.getPropertyValue(t).trim()}</span>`).join('');
+  };
+  palette();
+
+  // Switching here also switches the thumbnails (they get the storage event too; this covers blocked storage).
+  window.addEventListener('mockthemechange', e => {
+    palette();
+    document.querySelectorAll('.thumb iframe').forEach(f => {
+      try { f.contentWindow.MockTheme.set(e.detail.theme, { persist: false }); return; } catch (err) { /* not loaded yet */ }
+      if (!MockTheme.canStore()) f.src = thumbSrc(f.dataset.file);
+    });
+  });
+</script>
+</body>
+</html>

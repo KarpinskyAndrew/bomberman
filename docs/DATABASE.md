@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version** | 0.2 (draft) |
+| **Version** | 0.3 (draft) |
 | **Date** | 2026-11-11 |
 | **Parent** | [SPECIFICATION.md §7](./SPECIFICATION.md#7-data-model-postgresql) · [BACKEND-ARCHITECTURE.md §3–§4](./BACKEND-ARCHITECTURE.md#3-database-access-why-no-orm) · [EVENTS-AND-MESSAGING.md §6–§7](./EVENTS-AND-MESSAGING.md#6-producers) |
 
@@ -12,6 +12,7 @@ This document is the **source of truth for the database schema**. It lists every
 
 | Version | Changes |
 |---|---|
+| 0.3 | Follows SPEC v0.9: ranked is 1-vs-1 best-of-3, unrated is a single round. `matches.best_of` is now 1 or 3 and tied to `mode` (`matches_format_check`), and the standard ruleset no longer fixes `best_of`. `match_players` bounds tightened: `round_wins` 0–2, `round_points` 0–9. New column `matches.arena_size` (15 / 17 / 21); the standard ruleset is 15×15 with max 2 aliens. |
 | 0.2 | v1 runs PostgreSQL as a container on one VM (SPEC §8), so database roles are password login roles created by an init script instead of Cloud SQL IAM users (§7). Migrations move from golang-migrate to **Goose** (file names and `NO TRANSACTION`, §8). Housekeeping runs inside the worker (§6.1). The tables themselves are unchanged. |
 | 0.1 | First version. Builds on SPECIFICATION §7 v0.6 with these changes: per-round player results move from `match_rounds.players JSONB` into a real table, `match_round_players`. Password hashes move to `user_credentials`. Refresh tokens get rotation families and a binary hash. Matches store their full ruleset and the simulation version. The inbox is keyed per consumer. Every constraint has an explicit name. |
 
@@ -298,7 +299,8 @@ One row per finished best-of-N match that had **at least one registered player**
 | `private` | `BOOLEAN` | no | Private arenas are always `unrated` |
 | **Ruleset** (value object, §4.2) | | | |
 | `ruleset` | `TEXT` | no | `standard` \| `custom` |
-| `best_of` | `SMALLINT` | no | 1, 3 or 5 |
+| `best_of` | `SMALLINT` | no | **3** for ranked, **1** for unrated (SPEC §4.8.3) |
+| `arena_size` | `SMALLINT` | no | 15, 17 or 21 (tiles per side, SPEC §4.1). Always 15 for ranked. |
 | `wall_density_pct` | `SMALLINT` | no | 40–85 |
 | `wall_drop_pct` | `SMALLINT` | no | 0–60 |
 | `aliens_enabled` | `BOOLEAN` | no | |
@@ -323,6 +325,7 @@ CREATE TABLE matches (
   private           BOOLEAN     NOT NULL,
   ruleset           TEXT        NOT NULL,
   best_of           SMALLINT    NOT NULL,
+  arena_size        SMALLINT    NOT NULL,
   wall_density_pct  SMALLINT    NOT NULL,
   wall_drop_pct     SMALLINT    NOT NULL,
   aliens_enabled    BOOLEAN     NOT NULL,
@@ -341,14 +344,16 @@ CREATE TABLE matches (
   CONSTRAINT matches_mode_check        CHECK (mode IN ('ranked', 'unrated')),
   CONSTRAINT matches_ruleset_check     CHECK (ruleset IN ('standard', 'custom')),
   CONSTRAINT matches_result_check      CHECK (result IN ('win', 'draw')),
-  CONSTRAINT matches_best_of_check     CHECK (best_of IN (1, 3, 5)),
+  -- Ranked is always best-of-3, unrated always a single round (SPEC §4.8.3)
+  CONSTRAINT matches_format_check      CHECK ((mode = 'ranked' AND best_of = 3) OR (mode = 'unrated' AND best_of = 1)),
   CONSTRAINT matches_rounds_check      CHECK (rounds_played BETWEEN 1 AND best_of),
   CONSTRAINT matches_rule_values_check CHECK (
-    wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
-  -- 'standard' means exactly the locked ranked ruleset (SPEC §5.4.2 item 2)
+    arena_size IN (15, 17, 21)
+    AND wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
+  -- 'standard' means exactly the locked map rules (SPEC §5.4.2 item 2); the format follows the mode
   CONSTRAINT matches_standard_ruleset_check CHECK (
-    ruleset <> 'standard' OR (best_of = 3 AND wall_density_pct = 65 AND wall_drop_pct = 30
-                              AND aliens_enabled AND max_aliens = 4)),
+    ruleset <> 'standard' OR (arena_size = 15 AND wall_density_pct = 65 AND wall_drop_pct = 30
+                              AND aliens_enabled AND max_aliens = 2)),
   -- Ranked arenas are public and use the standard ruleset (SPEC §5.1, §5.4.2)
   CONSTRAINT matches_ranked_check      CHECK (mode <> 'ranked' OR (ruleset = 'standard' AND NOT private)),
   -- Only ranked matches can be rated
@@ -359,7 +364,7 @@ CREATE TABLE matches (
 CREATE INDEX matches_ended_at_idx ON matches (ended_at DESC);
 ```
 
-- The rated-eligibility rules that depend on players (≥ 2 registered players on the roster) are checked by `internal/rating` in Go. A CHECK can't look at other rows.
+- The rules that depend on players (a ranked match has exactly 2 players, both registered) are checked by `internal/rating` in Go. A CHECK can't look at other rows.
 - `arena_id` and `arena_name` are snapshots. Arenas exist only in memory (SPEC §7), so there is nothing to reference.
 
 ### 3.7 `match_players`: one row per roster slot
@@ -371,9 +376,9 @@ CREATE INDEX matches_ended_at_idx ON matches (ended_at DESC);
 | `user_id` | `UUID` | **yes** | FK → `users.id`, **set null**. NULL = guest, or a user who was later deleted. |
 | `display_name` | `TEXT` | no | Name shown in that match (snapshot). Replaced with `Deleted player` when the account is deleted (§6.2). |
 | **Standing** | | | |
-| `placement` | `SMALLINT` | no | **Match** placement 1–4 (SPEC §4.8.3). Ties share a value. |
-| `round_wins` | `SMALLINT` | no | 0–3 |
-| `round_points` | `SMALLINT` | no | 0–15 (3 points × at most 5 rounds) |
+| `placement` | `SMALLINT` | no | **Match** placement 1–4 (SPEC §4.8.3; 1–2 in ranked). Ties share a value. |
+| `round_wins` | `SMALLINT` | no | 0–2 (first to 2 wins the ranked best-of-3) |
+| `round_points` | `SMALLINT` | no | 0–9 (3 points × at most 3 rounds) |
 | `forfeited` | `BOOLEAN` | no | |
 | **Counters** (value object, totals over all rounds) | | | |
 | `kills`, `alien_kills`, `walls_destroyed`, `powerups_taken`, `bombs_placed` | `SMALLINT` | no | ≥ 0 |
@@ -404,7 +409,7 @@ CREATE TABLE match_players (
   CONSTRAINT match_players_slot_check        CHECK (slot BETWEEN 1 AND 4),
   CONSTRAINT match_players_display_name_check CHECK (length(display_name) BETWEEN 1 AND 32),
   CONSTRAINT match_players_standing_check    CHECK (
-    placement BETWEEN 1 AND 4 AND round_wins BETWEEN 0 AND 3 AND round_points BETWEEN 0 AND 15),
+    placement BETWEEN 1 AND 4 AND round_wins BETWEEN 0 AND 2 AND round_points BETWEEN 0 AND 9),
   CONSTRAINT match_players_counters_check    CHECK (
     kills >= 0 AND alien_kills >= 0 AND walls_destroyed >= 0 AND powerups_taken >= 0 AND bombs_placed >= 0),
   -- both-or-neither written with IS NULL on both sides, so the check can never evaluate to NULL (see §3.9 "NULL trap")
@@ -426,7 +431,7 @@ CREATE INDEX match_players_user_id_idx ON match_players (user_id, match_id DESC)
 | Column | Type | Null | Notes |
 |---|---|---|---|
 | `match_id` | `UUID` | no | PK part, FK → `matches.id`, cascade |
-| `round_no` | `SMALLINT` | no | PK part, 1–5 |
+| `round_no` | `SMALLINT` | no | PK part, 1–3 |
 | `seed` | `BIGINT` | no | Map/PRNG seed. Go `uint64` stored bit-for-bit as `int64` (§4.3). |
 | `started_at` | `TIMESTAMPTZ` | no | |
 | `duration_ms` | `INT` | no | 0–200,000 (3:00 + slack) |
@@ -451,7 +456,7 @@ CREATE TABLE match_rounds (
   CONSTRAINT match_rounds_pkey             PRIMARY KEY (match_id, round_no),
   CONSTRAINT match_rounds_match_id_fkey    FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE,
   CONSTRAINT match_rounds_winner_fkey      FOREIGN KEY (match_id, winner_slot) REFERENCES match_players (match_id, slot),
-  CONSTRAINT match_rounds_round_no_check   CHECK (round_no BETWEEN 1 AND 5),
+  CONSTRAINT match_rounds_round_no_check   CHECK (round_no BETWEEN 1 AND 3),
   CONSTRAINT match_rounds_timing_check     CHECK (duration_ms BETWEEN 0 AND 200000 AND end_tick >= 0),
   CONSTRAINT match_rounds_result_check     CHECK (result IN ('win', 'draw')),
   CONSTRAINT match_rounds_end_reason_check CHECK (end_reason IN ('last_standing', 'timeout_hp', 'simultaneous')),

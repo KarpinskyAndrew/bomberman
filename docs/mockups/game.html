@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In-game · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="mockups.css">
+<link rel="stylesheet" href="mockups-modern.css">
+</head>
+<body class="game-body" data-states="sudden|Unrated: sudden death;hit|Unrated: hit by a bomb;eaten|Unrated: eaten by an alien;spectating|Unrated: spectating;esc|Unrated: ESC menu;version|New version available;countdown|Ranked 1v1: countdown;round-end|Ranked 1v1: round end;touch|Touch controls (phone)">
+<i id="sudden" class="anchor"></i><i id="hit" class="anchor"></i>
+
+<!-- Default and most states: an unrated single round with 4 players (no round pips).
+     #countdown and #round-end: a ranked 1v1 best-of-3 (pips, ROUND 2 / 3); only ranked has a Round End banner. -->
+<div class="game">
+  <header class="hud-top">
+    <span class="clock"><svg class="i"><use href="#i-clock"/></svg><span class="sd-normal cd-hide">1:42</span><span class="cd-only">0:00</span><span class="sd-active">2:38</span></span>
+    <span class="round-title unr-only">noobs only · <b>UNRATED</b></span>
+    <span class="round-title rk-only">duel night · <b>ROUND 2 / 3</b></span>
+    <span class="sd-chip"><svg class="i"><use href="#i-warn"/></svg> <span class="txt">SUDDEN DEATH</span> <span class="sd-normal num cd-hide">in 0:22</span><span class="num cd-only">in 2:00</span><span class="sd-active">NOW</span></span>
+    <span class="ping num">24 ms</span>
+    <a class="icon-btn" href="#esc" aria-label="Menu (Esc)"><svg class="i"><use href="#i-pause"/></svg></a>
+  </header>
+
+  <aside class="hud-side left" aria-label="Players">
+    <!-- Unrated: Andrew (you) and Kate (eliminated) -->
+    <div class="pcard me unr-only" style="--pc:var(--p1)">
+      <div class="top"><span class="swatch"></span><b>Andrew</b><span class="you">YOU</span><span class="crown"><svg class="i"><use href="#i-crown"/></svg></span></div>
+      <span class="hearts dead-hide" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats dead-hide"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/2</span></div>
+      <span class="state dead-only"><svg class="i"><use href="#i-skull"/></svg> Eliminated · eaten by a Brute</span>
+    </div>
+    <div class="pcard out unr-only" style="--pc:var(--p3)">
+      <div class="top"><span class="swatch"></span><b>Kate</b></div>
+      <span class="state"><svg class="i"><use href="#i-skull"/></svg> Eliminated · eaten by a Brute</span>
+    </div>
+    <!-- Ranked 1v1: Andrew (you), leading 1-0 -->
+    <div class="pcard me rk-only" style="--pc:var(--p1)">
+      <div class="top"><span class="swatch"></span><b>Andrew</b><span class="you">YOU</span><span class="pips" aria-label="1 round win"><i class="on"></i><i></i></span></div>
+      <span class="hearts cd-only" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-only"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/1</span></div>
+      <span class="state dead-only"><svg class="i"><use href="#i-skull"/></svg> Eliminated · bomb by Kate</span>
+    </div>
+    <div class="aliens-box">
+      <b style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)">Aliens · <span class="cd-hide">3</span><span class="cd-only">0</span> / 4</b>
+      <span class="row"><span class="alien-dot" style="background:var(--a-drifter)"></span> Drifter <span class="dim">· wanders</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-seeker)"></span> Seeker <span class="dim">· hunts</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-brute)"></span> Brute <span class="dim">· 3 HP</span></span>
+      <span class="dim" style="font-size:12px">Touching an alien kills instantly.</span>
+    </div>
+  </aside>
+
+  <main class="stage arena-host">
+    <canvas id="arena" aria-label="Arena"></canvas>
+    <div class="hit-flash" aria-hidden="true"></div>
+    <div class="sd-hint"><svg class="i" style="color:var(--bad)"><use href="#i-clock"/></svg> At 3:00 the player with the most ♥ wins</div>
+
+    <!-- Countdown (ranked round 2) -->
+    <section class="overlay dim" id="countdown" aria-live="assertive">
+      <div class="cd">
+        <div class="lbl">ROUND 2</div>
+        <div class="nums" aria-hidden="true"><span>3</span><span>2</span><span>1</span><span>GO!</span></div>
+        <p class="muted" style="font-size:14px">Andrew leads 1–0 · your spawn is pulsing <span style="color:var(--p1);font-weight:700">blue</span></p>
+      </div>
+    </section>
+
+    <!-- Round end (ranked only: in unrated the round is the match, so Match End follows directly) -->
+    <section class="overlay" id="round-end">
+      <div class="banner">
+        <h3>ROUND 2</h3>
+        <div class="big"><svg class="i"><use href="#i-flag"/></svg> Kate takes the round!</div>
+        <div class="score-grid num" style="grid-template-columns:auto repeat(2, 1fr)">
+          <span class="h"></span><span class="h">Andrew</span><span class="h">Kate</span>
+          <span class="h">Score</span>
+          <span class="p" style="--pc:var(--p1)"><span class="pips"><i class="on"></i><i></i></span></span>
+          <span class="p" style="--pc:var(--p3)"><span class="pips"><i class="on"></i><i></i></span></span>
+          <span class="h">Points</span><span>5</span><span>5</span>
+        </div>
+        <p class="muted" style="margin-top:14px;font-size:14px">1–1. Round 3 starts in 4 s… <span class="dim">(the deciding round)</span></p>
+        <div class="bar"><i></i></div>
+      </div>
+    </section>
+
+    <!-- Eaten by an alien -->
+    <section class="overlay dim" id="eaten" aria-live="assertive">
+      <div class="death">
+        <div class="portrait"><canvas id="brute-portrait" aria-hidden="true"></canvas></div>
+        <h2>Eaten by a Brute</h2>
+        <p class="muted" style="margin:6px 0 16px">Aliens kill on contact, no matter how much ♥ you have.</p>
+        <a class="btn" href="#spectating"><svg class="i"><use href="#i-eye"/></svg> Spectate</a>
+      </div>
+    </section>
+
+    <!-- Spectating -->
+    <section class="overlay" id="spectating">
+      <div class="spectate-bar">
+        <svg class="i"><use href="#i-eye"/></svg>
+        <span><b>Spectating</b> <span class="muted">· 2 players left: Guest-4821 and mira</span></span>
+        <a class="btn btn-sm btn-danger" href="lobby.html"><svg class="i"><use href="#i-logout"/></svg> Leave arena</a>
+      </div>
+    </section>
+  </main>
+
+  <aside class="hud-side right" aria-label="Opponents">
+    <!-- Unrated opponents -->
+    <div class="pcard unr-only" style="--pc:var(--p2)">
+      <div class="top"><span class="swatch"></span><b>Guest-4821</b></div>
+      <span class="hearts" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 1/1</span></div>
+    </div>
+    <div class="pcard unr-only" style="--pc:var(--p4)">
+      <div class="top"><span class="swatch"></span><b>mira</b></div>
+      <span class="hearts" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/2</span></div>
+    </div>
+    <!-- Ranked opponent -->
+    <div class="pcard rk-only" style="--pc:var(--p3)">
+      <div class="top"><span class="swatch"></span><b>Kate</b><span class="pips cd-only" aria-label="0 round wins"><i></i><i></i></span><span class="pips cd-hide" aria-label="1 round win"><i class="on"></i><i></i></span></div>
+      <span class="hearts cd-only" aria-label="3 of 5 health"><span>♥</span><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-only"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 2</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/1</span></div>
+      <span class="hearts cd-hide" aria-label="2 of 5 health"><span>♥</span><span>♥</span><span class="e">♥</span><span class="e">♥</span><span class="e">♥</span></span>
+      <div class="stats cd-hide"><span class="fire"><svg class="i"><use href="#i-fire"/></svg> 3</span><span><svg class="i"><use href="#i-bomb"/></svg> 0/2</span></div>
+    </div>
+  </aside>
+
+  <footer class="killfeed" aria-live="polite">
+    <span class="lbl">Feed</span>
+    <span class="ev hl unr-only dead-only"><b style="color:var(--p1)">Andrew</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
+    <span class="ev hl-def unr-only"><b style="color:var(--p1)">Andrew</b> <svg class="i" style="color:var(--fire-2)"><use href="#i-bomb"/></svg> Seeker <span class="dim">(+bomb)</span></span>
+    <span class="ev unr-only"><b style="color:var(--p3)">Kate</b> <svg class="i"><use href="#i-skull"/></svg> eaten by a Brute</span>
+    <span class="ev unr-only"><b style="color:var(--p2)">Guest-4821</b> picked up <svg class="i" style="color:var(--fire-2)"><use href="#i-fire"/></svg></span>
+    <span class="ev hl rk-only cd-only">Round 2 is starting · Andrew leads 1–0 · both players at spawn</span>
+    <span class="ev hl rk-only dead-only"><b style="color:var(--p1)">Andrew</b> <svg class="i"><use href="#i-skull"/></svg> bomb by <b style="color:var(--p3)">Kate</b></span>
+    <span class="ev rk-only dead-only"><b style="color:var(--p3)">Kate</b> picked up <svg class="i" style="color:var(--fire-2)"><use href="#i-fire"/></svg></span>
+    <span class="ev rk-only dead-only"><b style="color:var(--p1)">Andrew</b> <svg class="i" style="color:var(--fire-2)"><use href="#i-bomb"/></svg> Drifter</span>
+  </footer>
+</div>
+
+<!-- ESC menu -->
+<div class="modal" id="esc" role="dialog" aria-modal="true" aria-labelledby="esc-t">
+  <div class="modal-card" style="width:min(380px,100%)">
+    <div class="modal-head"><h2 id="esc-t">Paused for you</h2><span class="kbd">Esc</span></div>
+    <div class="modal-body">
+      <p class="hint">The round keeps running for everyone else.</p>
+      <a class="btn btn-primary btn-lg btn-block" href="#"><svg class="i"><use href="#i-play"/></svg> Resume</a>
+      <a class="btn btn-lg btn-block" href="lobby.html#settings"><svg class="i"><use href="#i-gear"/></svg> Settings</a>
+      <a class="btn btn-lg btn-block btn-danger" href="lobby.html"><svg class="i"><use href="#i-logout"/></svg> Leave arena</a>
+      <div class="alert warn"><svg class="i"><use href="#i-warn"/></svg><span>Leaving now counts as a forfeit: you're placed last in this round. In a ranked duel a forfeit is a loss.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- New version available -->
+<div class="modal" id="version" role="dialog" aria-modal="true" aria-labelledby="ver-t">
+  <div class="modal-card" style="width:min(400px,100%)">
+    <div class="modal-head"><h2 id="ver-t">Update available</h2></div>
+    <div class="modal-body">
+      <p>A new version of BomberMan Online is available. Reload to keep playing.</p>
+      <p class="hint">Your game client is too old for this server (protocol mismatch).</p>
+    </div>
+    <div class="modal-foot"><a class="btn btn-primary" href="game.html"><svg class="i"><use href="#i-refresh"/></svg> Reload</a></div>
+  </div>
+</div>
+
+<!-- Touch layout (phones): compact top bar, arena fills the width, floating joystick + bomb button, no keyboard hints.
+     Ranked 1v1 round 2, Andrew leads 1-0 and is walking right. -->
+<section class="touch-view" id="touch" aria-label="Touch layout preview">
+  <div class="phone">
+    <div class="phone-notch" aria-hidden="true"><span>21:41</span><span>5G · 82 %</span></div>
+    <div class="t-bar">
+      <span class="clock"><svg class="i"><use href="#i-clock"/></svg>1:42</span>
+      <span class="t-p me" style="--pc:var(--p1)"><span class="pips"><i class="on"></i><i></i></span><b>Andrew</b><span class="hearts"><span>♥</span><span>♥</span><span>♥</span></span></span>
+      <span class="t-p" style="--pc:var(--p3)"><b style="color:var(--p3)">Kate</b><span class="hearts"><span>♥</span><span>♥</span></span><span class="pips"><i></i><i></i></span></span>
+      <a class="icon-btn" href="#" aria-label="Menu"><svg class="i"><use href="#i-menu"/></svg></a>
+    </div>
+    <div class="t-stage arena-host"><canvas id="touch-arena" aria-label="Arena"></canvas></div>
+    <div class="t-info"><span><b>ROUND 2 / 3</b> · duel night</span><span class="t-msg" role="status" data-idle="Try it: drag left, tap the bomb">Try it: drag left, tap the bomb</span></div>
+    <div class="t-controls">
+      <div class="joy" aria-label="Joystick">
+        <span class="dz" aria-hidden="true"></span>
+        <svg class="i arr u"><use href="#i-chevron-down"/></svg>
+        <svg class="i arr d"><use href="#i-chevron-down"/></svg>
+        <svg class="i arr l"><use href="#i-chevron-down"/></svg>
+        <svg class="i arr r"><use href="#i-chevron-down"/></svg>
+        <span class="touch-dot" aria-hidden="true"></span>
+        <span class="knob" aria-hidden="true"></span>
+      </div>
+      <button class="bomb-btn" type="button" aria-label="Drop bomb, 0 of 2 in use"><svg class="i"><use href="#i-bomb"/></svg><b>0/2</b></button>
+      <span class="t-cap l">Touch anywhere here: the joystick appears under your thumb</span>
+      <span class="t-cap r">Bomb</span>
+    </div>
+  </div>
+  <span class="phone-label">Touch layout · playable demo · on a laptop, drag with the mouse or use arrows + SPACE · <a href="#">back to desktop</a></span>
+</section>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  const C = Arena.COLORS;
+  function scene() {
+    const h = location.hash.slice(1);
+    // Ranked 1v1 (round 2): countdown at spawn, then the round end after Kate's bomb got Andrew.
+    if (h === 'countdown') {
+      // Ranked is always the Small 15x15 arena; two players start in opposite corners.
+      return { seed: 23, density: 0.62, spawnPulse: true, names: true, size: 15,
+        players: [{ x: 1, y: 1, color: C.p1, name: 'Andrew' }, { x: 13, y: 13, color: C.p3, name: 'Kate' }] };
+    }
+    if (h === 'round-end') {
+      return { seed: 23, density: 0.62, names: true, still: true, size: 15,
+        players: [{ x: 5, y: 3, color: C.p1, name: 'Andrew', dead: true }, { x: 9, y: 7, color: C.p3, name: 'Kate', dir: 'l' }],
+        aliens: [{ type: 'drifter', x: 11, y: 11 }, { type: 'brute', x: 13, y: 9, hp: 3 }],
+        fires: [{ x: 5, y: 5, range: 2 }], clear: [[5, 4], [5, 3]],
+        items: [{ x: 9, y: 1, kind: 'health' }, { x: 3, y: 11, kind: 'bomb' }] };
+    }
+    // Unrated round, 4 players: Kate was already eaten by the Brute.
+    const base = {
+      seed: 23, density: 0.62, names: true,
+      players: [
+        { x: 5, y: 3, color: C.p1, name: 'Andrew', dir: 'r', blink: h === 'hit' },
+        { x: 15, y: 9, color: C.p2, name: 'Guest-4821', dir: 'l' },
+        { x: 11, y: 17, color: C.p4, name: 'mira', dir: 'r' }
+      ],
+      aliens: [
+        { type: 'seeker', x: 7, y: 5, locked: true, target: [5, 3] },
+        { type: 'drifter', x: 11, y: 13 },
+        { type: 'brute', x: 17, y: 15, hp: 2 }
+      ],
+      bombs: [{ x: 15, y: 7 }, { x: 3, y: 5, fast: true }],
+      fires: [{ x: 9, y: 11, range: 3 }],
+      items: [{ x: 9, y: 1, kind: 'health' }, { x: 3, y: 9, kind: 'fire' }, { x: 13, y: 15, kind: 'bomb' }],
+      danger: [[3, 5], [3, 4], [3, 3], [3, 6], [3, 7], [2, 5], [1, 5], [4, 5], [5, 5]]
+    };
+    if (h === 'sudden') base.falling = [[1, 1], [2, 1], [3, 1], [1, 2], [1, 3]];
+    // Andrew was eaten by the Brute: eaten -> spectating. Guest-4821 and mira are still alive.
+    if (h === 'eaten' || h === 'spectating') {
+      base.players[0].dead = true;
+      base.aliens[2] = { type: 'brute', x: 5, y: 3, hp: 2 };
+      base.aliens[0] = { type: 'seeker', x: 7, y: 5, locked: true, target: [15, 9] };
+    }
+    return base;
+  }
+  const view = Arena.mount(document.getElementById('arena'), scene());
+  window.addEventListener('hashchange', () => view.update(scene()));
+  Arena.portrait(document.getElementById('brute-portrait'), { type: 'brute', hp: 3 }, 88);
+</script>
+<!-- Phone preview (#touch) is playable: joystick, bomb button and a tiny simulation. -->
+<script src="touch.js"></script>
+</body>
+</html>

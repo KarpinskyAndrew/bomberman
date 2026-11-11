@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waiting room · BomberMan Online mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="mockups.css">
+<link rel="stylesheet" href="mockups-modern.css">
+</head>
+<body data-states="countdown|All ready: starting in 12;paused|Countdown paused (Kate joined);ranked|Ranked 1v1 (2 slots);private|Private arena (invite code);not-host|As a non-host player">
+<i id="countdown" class="anchor"></i><i id="paused" class="anchor"></i><i id="ranked" class="anchor"></i><i id="private" class="anchor"></i><i id="not-host" class="anchor"></i>
+
+<header class="topbar room-bar">
+  <a class="btn btn-ghost btn-sm" href="lobby.html"><svg class="i"><use href="#i-arrow-left"/></svg> Leave</a>
+  <div class="title">
+    <b class="on-public">noobs only</b>
+    <b class="on-private">Kate's birthday</b>
+    <b class="on-ranked">duel night</b>
+    <span class="badge badge-unrated on-public" title="2–4 players · one round · never rated">Unrated</span>
+    <span class="badge badge-unrated on-private"><svg class="i"><use href="#i-lock"/></svg> Private</span>
+    <span class="badge badge-ranked on-ranked" title="1-vs-1 · best of 3 · standard rules · rated"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
+  </div>
+  <div class="spacer"></div>
+  <span class="code-pill on-private"><span class="lbl">Code</span> <b>K7M2QX</b>
+    <a class="icon-btn" href="#private" aria-label="Copy code" style="width:30px;height:30px"><svg class="i"><use href="#i-copy"/></svg></a>
+    <a class="icon-btn" href="#private" aria-label="Copy invite link" style="width:30px;height:30px"><svg class="i"><use href="#i-link"/></svg></a>
+  </span>
+  <a class="btn btn-sm no-private" href="#"><svg class="i"><use href="#i-link"/></svg> <span class="lbl">Copy link</span></a>
+  <span class="ping num"><span class="txt">EU ·</span> 24 ms</span>
+</header>
+
+<main class="page">
+  <div class="room">
+    <div class="stack">
+      <!-- Private only: the invite code, front and centre. The server creates it with the arena. -->
+      <section class="panel invite on-private" aria-labelledby="inv-t">
+        <div class="invite-main">
+          <span class="invite-lbl" id="inv-t"><svg class="i"><use href="#i-lock"/></svg> Invite code</span>
+          <b class="invite-code" aria-label="K 7 M 2 Q X">K7M2QX</b>
+        </div>
+        <div class="invite-actions">
+          <button type="button" class="btn btn-primary" data-copy="K7M2QX"><svg class="i"><use href="#i-copy"/></svg> <span>Copy code</span></button>
+          <button type="button" class="btn" data-copy="https://bomberman.space/arena/a1b2c3?code=K7M2QX"><svg class="i"><use href="#i-link"/></svg> <span>Copy invite link</span></button>
+        </div>
+        <p class="hint invite-help">Send the link (it joins directly), or tell them the code to enter in <b>Lobby → Join by code</b>. Only people with the code can join. Guests are welcome, so no account is needed.</p>
+      </section>
+
+      <!-- Unrated: up to 4 slots -->
+      <section class="slot-grid not-ranked" aria-label="Players">
+        <div class="slot me" style="--pc:var(--p1)">
+          <span class="avatar">A</span>
+          <span class="nm">Andrew</span>
+          <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span><span class="tier tier-gold num" style="font-size:13px">1342</span></span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+        <div class="slot me-nonhost" style="--pc:var(--p2)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove Guest-4821" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
+          <span class="avatar">G</span>
+          <span class="nm">Guest-4821</span>
+          <span class="tags"><span class="badge badge-guest">Guest</span></span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+        <div class="slot" style="--pc:var(--p4)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove mira" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
+          <span class="avatar">M</span>
+          <span class="nm">mira</span>
+          <span class="tags"><span class="tier tier-silver num" style="font-size:13px">1215</span></span>
+          <span class="state not on-idle"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+          <span class="state ready no-idle"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
+        <div class="slot empty no-paused" style="--pc:#2b3247">
+          <span class="avatar"><svg class="i"><use href="#i-plus"/></svg></span>
+          <span class="nm dim">Open slot</span>
+          <span class="tags"><span class="dim on-private" style="font-size:12px">Share code <b class="num">K7M2QX</b></span></span>
+          <span class="state not">Waiting<span class="dots-anim"><span>.</span><span>.</span><span>.</span></span></span>
+        </div>
+        <div class="slot newcomer on-paused" style="--pc:var(--p3)">
+          <a class="icon-btn kick host-only" href="#" aria-label="Remove Kate" title="Remove player"><svg class="i"><use href="#i-x"/></svg></a>
+          <span class="avatar">K</span>
+          <span class="nm">Kate</span>
+          <span class="tags"><span class="badge badge-live">New</span><span class="tier tier-silver num" style="font-size:13px">1290</span></span>
+          <span class="state not"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+      </section>
+
+      <!-- Ranked 1v1: 2 slots with rating and tier -->
+      <section class="slot-grid duo on-ranked" aria-label="Players">
+        <div class="slot me" style="--pc:var(--p1)">
+          <span class="avatar">A</span>
+          <span class="nm">Andrew</span>
+          <span class="tags"><span class="badge badge-host"><svg class="i"><use href="#i-crown"/></svg> Host</span></span>
+          <span class="tier tier-gold">Gold · <span class="num">1342</span></span>
+          <span class="dim num" style="font-size:12px">#87 · 30 rated matches</span>
+          <span class="state ready you-ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+          <span class="state not you-unready"><svg class="i"><use href="#i-x"/></svg> Not ready</span>
+        </div>
+        <span class="vs" aria-hidden="true">VS</span>
+        <div class="slot" style="--pc:var(--p3)">
+          <span class="avatar">K</span>
+          <span class="nm">Kate</span>
+          <span class="tags"></span>
+          <span class="tier tier-silver">Silver · <span class="num">1290</span></span>
+          <span class="dim num" style="font-size:12px">#142 · 61 rated matches</span>
+          <span class="state ready"><svg class="i"><use href="#i-check"/></svg> Ready</span>
+        </div>
+      </section>
+
+      <section class="panel panel-pad stack">
+        <div class="rules on-public">
+          <span class="chip">Unrated</span>
+          <span class="chip">1 round</span><span class="chip">Large 21×21</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 4</span>
+          <a class="btn btn-sm btn-ghost host-only" href="#"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
+        </div>
+        <div class="rules on-private">
+          <span class="chip">Unrated</span>
+          <span class="chip">1 round</span><span class="chip">Medium 17×17</span><span class="chip">80 % walls</span><span class="chip">45 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 6</span>
+          <a class="btn btn-sm btn-ghost host-only" href="#private"><svg class="i"><use href="#i-gear"/></svg> Edit rules</a>
+        </div>
+        <div class="rules on-ranked">
+          <span class="chip hot"><svg class="i"><use href="#i-star"/></svg> Ranked 1v1</span>
+          <span class="chip">Best of 3</span><span class="chip">Small 15×15</span><span class="chip">65 % walls</span><span class="chip">30 % drops</span>
+          <span class="chip"><svg class="i"><use href="#i-alien"/></svg> Aliens: 2</span>
+        </div>
+        <p class="hint on-public">One round, last player standing wins. Unrated arenas are never rated, and guests are welcome. <span class="host-only">Changing a rule un-readies everyone.</span></p>
+        <p class="hint on-private">Private arenas are never rated. Share the code or the link to invite friends. <span class="host-only">Changing a rule un-readies everyone.</span></p>
+        <p class="hint on-ranked">Standard rules, locked. First to 2 round wins takes the match, and both players are rated afterwards.</p>
+        <p class="hint on-nonhost">Only the host (Andrew) can change the rules or remove players.</p>
+
+        <!-- 15 s ready countdown: no Start button, the match starts on its own -->
+        <div class="ready-box on-idle" aria-live="polite">
+          <span class="ring grey" style="--p:67"><b class="num" style="font-size:20px">2/3</b></span>
+          <span class="txt"><b>2 of 3 ready</b><span>The match starts 15 s after everyone is ready. Waiting for mira.</span></span>
+        </div>
+        <div class="ready-box on-countdown" aria-live="polite">
+          <span class="ring run" style="--p:80"><b>12</b></span>
+          <span class="txt"><span class="display">Starting in 12</span><span>Everyone is ready. Players can still join until 0; un-ready to pause.</span></span>
+        </div>
+        <div class="ready-box on-paused" aria-live="polite">
+          <span class="ring grey" style="--p:100"><svg class="i"><use href="#i-pause"/></svg></span>
+          <span class="txt"><b>Paused: Kate joined</b><span>3 of 4 ready. The countdown restarts from 15 s when Kate is ready.</span></span>
+        </div>
+        <div class="ready-box on-ranked" aria-live="polite">
+          <span class="ring run" style="--p:60"><b>9</b></span>
+          <span class="txt"><span class="display">Starting in 9</span><span>Both players are ready. The arena is full; un-ready to pause.</span></span>
+        </div>
+        <!-- Shown in every state once you un-ready: the countdown can't run without you -->
+        <div class="ready-box you-wait" aria-live="polite">
+          <span class="ring grey" style="--p:100"><svg class="i"><use href="#i-pause"/></svg></span>
+          <span class="txt"><b>Waiting for you</b><span>The 15 s countdown runs only while everyone is ready, you included.</span></span>
+        </div>
+
+        <!-- Toggle button: the label stays "Ready"; aria-pressed and the style show the state -->
+        <div class="room-actions" style="padding:6px 0 0">
+          <button type="button" class="btn btn-lg ready-toggle" id="ready-toggle" aria-pressed="true"><svg class="i"><use href="#i-check"/></svg> Ready</button>
+        </div>
+        <p class="hint you-ready" style="text-align:center">You're ready. Press again to un-ready.</p>
+        <p class="hint you-unready" style="text-align:center">You're not ready. Press Ready when you're set.</p>
+      </section>
+    </div>
+
+    <aside class="stack">
+      <section class="panel">
+        <div class="panel-head"><h2>Map preview</h2><span class="dim" style="font-size:12px"><span class="on-public">Large 21 × 21 · one round</span><span class="on-private">Medium 17 × 17 · one round</span><span class="on-ranked">Small 15 × 15 · new map every round</span></span></div>
+        <div style="padding:14px"><div class="map-preview arena-host"><canvas id="preview" aria-hidden="true"></canvas><div class="veil">Revealed at the countdown</div></div></div>
+      </section>
+      <section class="panel panel-pad">
+        <h2 style="font-size:16px;margin-bottom:12px">Controls</h2>
+        <div class="keys">
+          <span class="k"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span></span><span class="muted">Move (or arrow keys)</span>
+          <span class="k"><span class="kbd">Space</span></span><span class="muted">Drop a bomb</span>
+          <span class="k"><span class="kbd">Esc</span></span><span class="muted">Menu</span>
+        </div>
+        <p class="hint" style="margin-top:12px">On phones and tablets: a joystick and a bomb button instead (<a href="game.html#touch">preview</a>).</p>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script src="arena.js"></script>
+<script src="mock.js"></script>
+<script>
+  // The map preview follows the arena size: Large for the default room, Medium for the private one, Small for ranked.
+  const sizeFor = h => (h === 'ranked' ? 15 : h === 'private' ? 17 : 21);
+  const preview = Arena.mount(document.getElementById('preview'), { seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) });
+  window.addEventListener('hashchange', () => preview.update({ seed: 42, density: 0.65, still: true, size: sizeFor(location.hash.slice(1)) }));
+
+  // Ready toggle. You start ready in every state; switching state resets it.
+  const readyBtn = document.getElementById('ready-toggle');
+  const setReady = on => {
+    readyBtn.setAttribute('aria-pressed', String(on));
+    document.body.classList.toggle('me-unready', !on);
+  };
+  readyBtn.addEventListener('click', () => setReady(readyBtn.getAttribute('aria-pressed') !== 'true'));
+  window.addEventListener('hashchange', () => setReady(true));
+
+  // Copy buttons: copy the value and show "Copied" for 1.5 s.
+  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy); } catch { /* clipboard may be blocked on file://; the mockup still shows the feedback */ }
+    const lbl = btn.querySelector('span');
+    const was = lbl.textContent;
+    lbl.textContent = 'Copied';
+    setTimeout(() => { lbl.textContent = was; }, 1500);
+  }));
+</script>
+</body>
+</html>
