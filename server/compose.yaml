@@ -9,10 +9,17 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in local.env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in local.env}
       POSTGRES_DB: bomberman
+      # Login roles created by deploy/postgres/init/01-roles.sh (DATABASE.md §7).
+      # The init script only runs on an empty pgdata volume.
+      PG_MIGRATOR_PASSWORD: ${PG_MIGRATOR_PASSWORD:?set PG_MIGRATOR_PASSWORD in local.env}
+      PG_API_PASSWORD: ${PG_API_PASSWORD:?set PG_API_PASSWORD in local.env}
+      PG_WORKER_PASSWORD: ${PG_WORKER_PASSWORD:?set PG_WORKER_PASSWORD in local.env}
+      PG_GAMESERVER_PASSWORD: ${PG_GAMESERVER_PASSWORD:?set PG_GAMESERVER_PASSWORD in local.env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ../deploy/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # $$ = expanded by the container's shell, not by Compose
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]

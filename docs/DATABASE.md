@@ -876,7 +876,7 @@ The table ownership in §1.3 is enforced in the database. That makes SPEC §9 ("
 |---|---|
 | `migrator` | Owns the schema and all tables. Used only by the `migrate` container. |
 | `api` | `SELECT, INSERT, UPDATE, DELETE` on `users`, `user_credentials`, `refresh_tokens`, `outbox`. `INSERT` on `player_ratings`, `user_stats` (registration). `UPDATE (display_name)` on `match_players` (§6.2). `SELECT` on everything else. |
-| `worker` | `SELECT, INSERT, UPDATE` on `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history`, `processed_events`, `user_stats`, `player_ratings`. `DELETE` on the housekeeping tables. `SELECT` on `users`. |
+| `worker` | `SELECT, INSERT, UPDATE` on `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history`, `processed_events`, `user_stats`, `player_ratings`. `SELECT` on `users`. Housekeeping (§6.1): `DELETE` on `processed_events`, `SELECT, DELETE` on `outbox` and `refresh_tokens` (a `DELETE … WHERE` needs `SELECT` on the filtered columns). |
 | `gameserver` | `CONNECT` only. `LISTEN rating_updated` needs no table privileges, so the game server **can't** write anything, by construction. |
 
 - **Roles** are cluster-level objects with passwords, so they are not created by a migration. In v1 `deploy/postgres/init/01-roles.sh` creates them the first time the Postgres container starts, reading the passwords from the environment (`.env`, filled from Secret Manager). The superuser `postgres` is used only by that script and by backups. In v2 the same roles are created on Cloud SQL by the runbook.
