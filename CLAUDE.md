@@ -17,6 +17,16 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4
 | `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; weekly playtests from sprint 2 (tunnel), first full game in sprint 4, live URL in sprint 5, solo mode in sprint 8; maps milestones and acceptance criteria to sprints |
 | `docs/CI-CD.md` | GitHub Actions pipelines, the v1 single-VM Docker Compose deployment, migration policy, branching model, public-repo safeguards, path to GKE + Helm |
 
+## Test-first development (mandatory)
+
+Every function starts with a **failing test**, then the code that makes it pass (red → green → refactor):
+
+1. **Red:** write the test for the new behavior first. Add only a stub (zero values, `panic("not implemented")`, an empty component) so the test compiles, run it, and **see it fail for the right reason** (a wrong result, not a compile error).
+2. **Green:** write the simplest code that makes the test pass.
+3. **Refactor:** clean up with the tests green.
+
+This applies to Go (`testing` + testify), TypeScript and Vue (Vitest, Vue Test Utils) alike, and to bug fixes: first a test that reproduces the bug, then the fix. Commit the test together with the code that makes it pass, never code without its test. Exceptions are code with nothing to assert: generated code (sqlc, buf, mockery), wiring in `cmd/*/main.go`, and config files. Canvas drawing is tested through the logic it draws from, not by its pixels.
+
 ## Git workflow (mandatory)
 
 - **Allowed:** create `feature/<topic>` or `bugfix/<topic>` branches from `dev`, commit to them, push them, merge branches locally (e.g. `dev` into a feature branch, or one feature branch into another), and open pull requests with `gh pr create --base dev`.
