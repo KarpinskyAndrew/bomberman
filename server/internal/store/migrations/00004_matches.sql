@@ -9,6 +9,7 @@ CREATE TABLE matches (
   private           BOOLEAN     NOT NULL,
   ruleset           TEXT        NOT NULL,
   best_of           SMALLINT    NOT NULL,
+  arena_size        SMALLINT    NOT NULL,
   wall_density_pct  SMALLINT    NOT NULL,
   wall_drop_pct     SMALLINT    NOT NULL,
   aliens_enabled    BOOLEAN     NOT NULL,
@@ -27,14 +28,16 @@ CREATE TABLE matches (
   CONSTRAINT matches_mode_check        CHECK (mode IN ('ranked', 'unrated')),
   CONSTRAINT matches_ruleset_check     CHECK (ruleset IN ('standard', 'custom')),
   CONSTRAINT matches_result_check      CHECK (result IN ('win', 'draw')),
-  CONSTRAINT matches_best_of_check     CHECK (best_of IN (1, 3, 5)),
+  -- Ranked is always best-of-3, unrated always a single round (SPEC §4.8.3)
+  CONSTRAINT matches_format_check      CHECK ((mode = 'ranked' AND best_of = 3) OR (mode = 'unrated' AND best_of = 1)),
   CONSTRAINT matches_rounds_check      CHECK (rounds_played BETWEEN 1 AND best_of),
   CONSTRAINT matches_rule_values_check CHECK (
-    wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
-  -- 'standard' means exactly the locked ranked ruleset (SPEC §5.4.2 item 2)
+    arena_size IN (15, 17, 21)
+    AND wall_density_pct BETWEEN 40 AND 85 AND wall_drop_pct BETWEEN 0 AND 60 AND max_aliens BETWEEN 0 AND 8),
+  -- 'standard' means exactly the locked map rules (SPEC §5.4.2 item 2); the format follows the mode
   CONSTRAINT matches_standard_ruleset_check CHECK (
-    ruleset <> 'standard' OR (best_of = 3 AND wall_density_pct = 65 AND wall_drop_pct = 30
-                              AND aliens_enabled AND max_aliens = 4)),
+    ruleset <> 'standard' OR (arena_size = 15 AND wall_density_pct = 65 AND wall_drop_pct = 30
+                              AND aliens_enabled AND max_aliens = 2)),
   -- Ranked arenas are public and use the standard ruleset (SPEC §5.1, §5.4.2)
   CONSTRAINT matches_ranked_check      CHECK (mode <> 'ranked' OR (ruleset = 'standard' AND NOT private)),
   -- Only ranked matches can be rated
@@ -67,7 +70,7 @@ CREATE TABLE match_players (
   CONSTRAINT match_players_slot_check        CHECK (slot BETWEEN 1 AND 4),
   CONSTRAINT match_players_display_name_check CHECK (length(display_name) BETWEEN 1 AND 32),
   CONSTRAINT match_players_standing_check    CHECK (
-    placement BETWEEN 1 AND 4 AND round_wins BETWEEN 0 AND 3 AND round_points BETWEEN 0 AND 15),
+    placement BETWEEN 1 AND 4 AND round_wins BETWEEN 0 AND 2 AND round_points BETWEEN 0 AND 9),
   CONSTRAINT match_players_counters_check    CHECK (
     kills >= 0 AND alien_kills >= 0 AND walls_destroyed >= 0 AND powerups_taken >= 0 AND bombs_placed >= 0),
   -- both-or-neither written with IS NULL on both sides, so the check can never evaluate to NULL (see §3.9 "NULL trap")
@@ -92,7 +95,7 @@ CREATE TABLE match_rounds (
   CONSTRAINT match_rounds_pkey             PRIMARY KEY (match_id, round_no),
   CONSTRAINT match_rounds_match_id_fkey    FOREIGN KEY (match_id) REFERENCES matches (id) ON DELETE CASCADE,
   CONSTRAINT match_rounds_winner_fkey      FOREIGN KEY (match_id, winner_slot) REFERENCES match_players (match_id, slot),
-  CONSTRAINT match_rounds_round_no_check   CHECK (round_no BETWEEN 1 AND 5),
+  CONSTRAINT match_rounds_round_no_check   CHECK (round_no BETWEEN 1 AND 3),
   CONSTRAINT match_rounds_timing_check     CHECK (duration_ms BETWEEN 0 AND 200000 AND end_tick >= 0),
   CONSTRAINT match_rounds_result_check     CHECK (result IN ('win', 'draw')),
   CONSTRAINT match_rounds_end_reason_check CHECK (end_reason IN ('last_standing', 'timeout_hp', 'simultaneous')),

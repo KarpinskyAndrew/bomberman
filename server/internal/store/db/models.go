@@ -19,6 +19,7 @@ type Match struct {
 	Private        bool
 	Ruleset        string
 	BestOf         int16
+	ArenaSize      int16
 	WallDensityPct int16
 	WallDropPct    int16
 	AliensEnabled  bool
