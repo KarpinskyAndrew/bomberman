@@ -31,6 +31,10 @@
   --t-platinum: #67d4cf;
   --t-diamond: #8fb8ff;
 
+  --a-drifter: #5fd35a;
+  --a-seeker: #9b5de5;
+  --a-brute: #c0392b;
+
   --radius: 14px;
   /* Web fonts come from Google Fonts; the fallbacks keep pages readable if they fail to load. */
   --font-display: "Bungee", "Arial Black", "Segoe UI Black", Impact, system-ui, sans-serif;
@@ -331,6 +335,20 @@ img, svg, canvas { display: block; }
 .mock-menu a:hover { background: rgba(0, 0, 0, 0.06); }
 .mock-menu a[aria-current="true"] { background: #0a0e18; color: #f3f1ea; }
 .mock-menu a[aria-current="true"] small { color: #a7adbd; }
+
+/* Corner dock: design switch (theme.js) above the navigator (mock.js). Not part of the real UI. */
+.mock-dock { position: fixed; right: 16px; bottom: 16px; z-index: 100; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; font-size: 13px; }
+.mock-dock .mock-nav { position: relative; right: auto; bottom: auto; }
+.theme-switch {
+  display: inline-flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px;
+  background: #f3f1ea; color: #0a0e18; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); font: 600 13px var(--font-ui);
+}
+.theme-switch-lbl { padding: 0 6px 0 9px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #5e5a4c; }
+.theme-switch button { display: inline-flex; align-items: baseline; gap: 4px; border: 0; background: transparent; color: inherit; font: inherit; padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+.theme-switch button small { font-size: 10px; font-weight: 700; opacity: 0.6; }
+.theme-switch button:hover { background: rgba(0, 0, 0, 0.07); }
+.theme-switch button[aria-pressed="true"] { background: #0a0e18; color: #f3f1ea; }
+.theme-switch button:focus-visible { outline: 2px solid var(--fire-2); outline-offset: 2px; }
 
 /* =====================================================================
    Landing
@@ -805,6 +823,24 @@ body:has(#placement:target) .rated-only { display: none; }
 .palette { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .palette span { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .palette i { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--edge); }
+/* The two designs (v1 retro, v2 modern). Each card previews its own fonts whatever the active theme is. */
+.designs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
+.design-card {
+  display: grid; gap: 6px; text-align: left; padding: 16px 18px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--edge); background: var(--surface); color: var(--ink); font: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.design-card:hover { border-color: var(--edge-strong); }
+.design-card[aria-pressed="true"] { border-color: var(--fire-2); box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.18); }
+.design-card:focus-visible { outline: 2px solid var(--fire-1); outline-offset: 2px; }
+.design-card .top { display: flex; align-items: center; gap: 10px; }
+.design-card .tag { font: 700 11px var(--font-ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--edge-strong); }
+.design-card .on { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--fire-1); visibility: hidden; }
+.design-card[aria-pressed="true"] .on { visibility: visible; }
+.design-card .sample { font-size: 24px; line-height: 1.1; }
+.design-card .sample.retro { font-family: "Bungee", "Arial Black", Impact, sans-serif; color: #ff9a3c; }
+.design-card .sample.modern { font: 800 25px/1.1 Inter, system-ui, sans-serif; letter-spacing: -0.02em; background: linear-gradient(180deg, #ffdd55, #ff8a1f 55%, #ff3d2e); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.design-card p { font-size: 13px; color: var(--muted); }
 
 /* =====================================================================
    Responsive

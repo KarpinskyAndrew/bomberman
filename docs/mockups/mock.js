@@ -74,7 +74,9 @@
     for (const [id, label] of states) html += `<a href="#${id}" data-state="${id}">${esc(label)}</a>`;
   }
   html += '</div></details>';
-  document.body.insertAdjacentHTML('beforeend', html);
+  // theme.js owns a fixed corner dock (theme switch on top, this navigator below it).
+  const host = (window.MockTheme && window.MockTheme.dock()) || document.body;
+  host.insertAdjacentHTML('beforeend', html);
 
   const mark = () => {
     const h = location.hash.slice(1);

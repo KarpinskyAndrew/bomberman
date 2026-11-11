@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
 <link rel="stylesheet" href="mockups.css">
+<link rel="stylesheet" href="mockups-modern.css">
 </head>
 <body class="game-body" data-states="sudden|Unrated: sudden death;hit|Unrated: hit by a bomb;eaten|Unrated: eaten by an alien;spectating|Unrated: spectating;esc|Unrated: ESC menu;version|New version available;countdown|Ranked 1v1: countdown;round-end|Ranked 1v1: round end;touch|Touch controls (phone)">
 <i id="sudden" class="anchor"></i><i id="hit" class="anchor"></i>
@@ -45,9 +47,9 @@
     </div>
     <div class="aliens-box">
       <b style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)">Aliens · <span class="cd-hide">3</span><span class="cd-only">0</span> / 4</b>
-      <span class="row"><span class="alien-dot" style="background:#5fd35a"></span> Drifter <span class="dim">· wanders</span></span>
-      <span class="row"><span class="alien-dot" style="background:#9b5de5"></span> Seeker <span class="dim">· hunts</span></span>
-      <span class="row"><span class="alien-dot" style="background:#c0392b"></span> Brute <span class="dim">· 3 HP</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-drifter)"></span> Drifter <span class="dim">· wanders</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-seeker)"></span> Seeker <span class="dim">· hunts</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-brute)"></span> Brute <span class="dim">· 3 HP</span></span>
       <span class="dim" style="font-size:12px">Touching an alien kills instantly.</span>
     </div>
   </aside>
