@@ -479,6 +479,27 @@ export class EventDispatcher {
 | Alien portal | A swirling ring in the alien type's color, growing over 1.5 s |
 | Sudden death | Screen border pulses red, falling-block shadow appears 0.5 s before impact |
 
+#### Two designs: v1 retro and v2 modern
+
+The mockups in `docs/mockups/` come in two designs. Both use the same markup, content and interactions; only the look changes.
+
+| | v1 retro | v2 modern |
+|---|---|---|
+| Idea | Arcade: chunky display type, pixel-art arena | Matches the bomberman.space landing page: sleek and high-tech |
+| Fonts | "Bungee" for titles and the timer, "Inter" for body text | "Inter" only: heavy (800) with tight tracking for titles, small caps with wide tracking for labels, a system monospace for invite codes |
+| Surfaces | Solid dark panels, 14 px radius | Glass: translucent navy, 14 px backdrop blur, 1 px light edge, 18–24 px radius, pills for badges and chips |
+| Accent | Fire gradient (`#ffdd55` → `#ff8a1f` → `#ff3d2e`) | The same fire gradient, plus soft glows on primary actions, focus rings and live elements |
+| Background | Flat `#0a0e18` | `#070a13` with a faint 32 px grid and two large radial glows (orange, blue) |
+| Arena canvas | Pixel art (`image-rendering: pixelated`) | Vector shapes with gradients and glows: rounded steel blocks, amber energy crates, round helmeted players, glowing fire beams |
+| Player colors | `#4da3ff`, `#ff9a3c`, `#47d16c`, `#e46bd6` | Okabe-Ito, brightened for the dark arena: `#2f9be6`, `#f5b034`, `#19c29a`, `#e79bcb`. Each player also wears a different crest (circle, triangle, square, diamond), so color is never the only cue. |
+
+**How it works:**
+- The theme is `data-theme="retro" | "modern"` on `<html>`. `mockups.css` is the retro theme, and `mockups-modern.css` overrides its CSS custom properties (colors, fonts, radii, shadows) and component styles under `[data-theme="modern"]`.
+- `theme.js` runs in `<head>`, so the theme is set before the first paint. It picks `?theme=` from the URL first, then the saved choice, then retro. The choice is saved in `localStorage` (when storage is blocked, links between mockups carry `?theme=` instead).
+- Every screen has a **Retro / Modern** switch in the bottom-right corner (two toggle buttons with `aria-pressed`). Switching applies at once, without a reload. The index page shows both designs side by side and switches its thumbnails too.
+- `arena.js` watches the attribute and redraws every arena canvas and portrait in the active style, including the playable touch demo.
+- New v2 animations only run with `prefers-reduced-motion: no-preference`.
+
 ### 6.4 Assets
 
 - One **sprite atlas** (`atlas.png` + `atlas.json`, TexturePacker or free-tex-packer format) is loaded before entering an arena and cached by a service worker.
