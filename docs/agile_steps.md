@@ -139,7 +139,7 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
 - **Demo:** the live HTTPS URL, opened by 3–5 friends on their own machines, browsers and networks. Then a bug report sent from the game's feedback button shows up as a GitHub issue.
 - **Learn:** does the game connect at all on testers' networks and browsers (Safari, Firefox, company Wi-Fi, mobile data)? What is their real RTT? How laggy does movement feel without prediction?
 - **Scope:**
-  - Resolve the open questions first: domain, VM size, license (CI-CD §10).
+  - Resolve the open questions first: domain and VM size (CI-CD §10). The license is decided (BSL 1.1, PR #9).
   - GCP bootstrap runbook (CI-CD §8): project, EU locations, Artifact Registry, VM in `europe-west3`, IAP SSH, firewall 80/443 only.
   - Production compose, first cut: Caddy (TLS + SPA) and gameserver. Postgres, Envoy, API and worker join in later sprints.
   - `release.yml`: build on push to `main`, manual approval through the `production` environment, `deploy.sh` on the VM (CI-CD §4.2, §4.3). First `dev` → `main` fast-forward.
@@ -483,7 +483,7 @@ Track the sprints as GitHub Milestones (`Sprint 01` …) with one issue per scop
 
 ## 7. Open questions
 
-1. **Domain, VM size and license** (CI-CD §10) must be decided before sprint 3.
+1. **Domain and VM size** (CI-CD §10) must be decided before sprint 3.
 2. **Beta data at launch:** keep the beta testers' accounts and ratings at v1.0, or reset them? The spec has no seasons or resets *after* launch (§5.4.1); a one-time reset before launch would give everyone a fair start, but costs early testers their progress. Decide before sprint 15, and tell the testers when they register.
 3. **Tester recruitment:** who are the 3–8 alpha testers (sprint 3) and the 20–50 beta testers (sprint 14)?
 
