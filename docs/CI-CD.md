@@ -86,7 +86,7 @@ The source is public, so anyone can read it, fork it and open PRs. The pipeline 
 | Unreviewed changes reaching `dev` or `main` | Branch rulesets (§3a): changes arrive only through PRs, with the `ci` check and a maintainer review required. Force-pushes and deletions are blocked. |
 | Resource names in docs and workflows | Project IDs, bucket names and regions are not secret and may stay in the repo. Access is controlled by IAM, not by hiding names. |
 
-Open items for going public: pick a **license**, and add `SECURITY.md` (how to report vulnerabilities privately) and `CONTRIBUTING.md` (the branching rules from §3a). See §10.
+The license is the Business Source License 1.1 (§10). Open items for going public: add `SECURITY.md` (how to report vulnerabilities privately) and `CONTRIBUTING.md` (the branching rules from §3a). See §10.
 
 ---
 
@@ -415,10 +415,10 @@ Because the transport, publisher and store are behind interfaces, none of this c
 
 - **Git hosting and CI:** a public GitHub repository with GitHub Actions (§2a, §4), using the branching model in §3a.
 - **v1 hosting:** one Compute Engine VM with Docker Compose (§6). No Terraform in v1.
+- **License:** source-available under the **Business Source License 1.1** (`LICENSE`), Additional Use Grant *None*, so no production use by others, and Change License GPL-3.0-or-later. A version converts on the Change Date or four years after it was first published, whichever comes first. Moving the Change Date forward to "release date + 4 years" at each release keeps the full window; that is a manual edit of `LICENSE`.
 
 **Still open:**
 
 1. **Domain name** for the game (the landing page uses `bomberman.space`).
 2. **Game server deploy window (v1):** which time of day? For example 05:00–06:00 CET.
 3. **VM size at launch:** `e2-standard-2` (cheaper) or `e2-standard-4` (headroom for the 200-arena target, spec §5.3).
-4. **License** for the public source: for example MIT, Apache-2.0 or AGPL-3.0.
