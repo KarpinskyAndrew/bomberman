@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE player_ratings (
   user_id        UUID        NOT NULL,
   rating         INT         NOT NULL DEFAULT 1200,
@@ -40,3 +41,8 @@ CREATE TABLE user_stats (
     kills >= 0 AND alien_kills >= 0 AND walls_destroyed >= 0 AND powerups_taken >= 0 AND bombs_placed >= 0),
   CONSTRAINT user_stats_deaths_check  CHECK (deaths_by_alien BETWEEN 0 AND deaths AND deaths <= rounds_played)
 );
+
+
+-- +goose Down
+DROP TABLE IF EXISTS user_stats;
+DROP TABLE IF EXISTS player_ratings;

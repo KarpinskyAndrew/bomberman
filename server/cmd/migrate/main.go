@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"os/signal"
 
 	"github.com/KarpinskyAndrew/bomberman/server/internal/store"
 )
@@ -14,7 +16,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := store.Migrate(url); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	if err := store.Migrate(ctx, url); err != nil {
 		slog.Error("migration failed", "err", err)
 		os.Exit(1)
 	}

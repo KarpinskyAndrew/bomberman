@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE matches (
   id                UUID        NOT NULL,
   arena_id          TEXT        NOT NULL,
@@ -151,7 +152,14 @@ CREATE TABLE rating_history (
   CONSTRAINT rating_history_delta_check   CHECK (delta = rating_after - rating_before),
   CONSTRAINT rating_history_k_check       CHECK (k_factor IN (16, 24, 40))
 );
--- Rating chart (GET /api/users/:username/rating-history), newest first
+-- Rating chart (ProfileService.GetRatingHistory), newest first
 CREATE INDEX rating_history_user_created_idx ON rating_history (user_id, created_at DESC);
 -- FK index for the matches cascade; also "who was rated in this match"
 CREATE INDEX rating_history_match_id_idx     ON rating_history (match_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS rating_history;
+DROP TABLE IF EXISTS match_round_players;
+DROP TABLE IF EXISTS match_rounds;
+DROP TABLE IF EXISTS match_players;
+DROP TABLE IF EXISTS matches;

@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE processed_events (
   consumer      TEXT        NOT NULL,
   event_id      UUID        NOT NULL,
@@ -30,3 +31,8 @@ CREATE TABLE outbox (
 CREATE INDEX outbox_unpublished_idx ON outbox (created_at) WHERE published_at IS NULL;
 -- housekeeping: delete rows published more than 7 days ago
 CREATE INDEX outbox_published_at_idx ON outbox (published_at) WHERE published_at IS NOT NULL;
+
+
+-- +goose Down
+DROP TABLE IF EXISTS outbox ;
+DROP TABLE IF EXISTS processed_events  ;

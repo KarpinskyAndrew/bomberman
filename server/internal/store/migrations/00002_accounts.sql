@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE users (
     id              UUID        NOT NULL,
     username        CITEXT      NOT NULL,
@@ -46,3 +47,8 @@ CREATE INDEX refresh_tokens_family_id_idx  ON refresh_tokens (family_id);
 CREATE INDEX refresh_tokens_replaced_by_idx ON refresh_tokens (replaced_by) WHERE replaced_by IS NOT NULL;
 -- housekeeping
 CREATE INDEX refresh_tokens_expires_at_idx ON refresh_tokens (expires_at);
+
+-- +goose Down
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS user_credentials;
+DROP TABLE IF EXISTS users;
