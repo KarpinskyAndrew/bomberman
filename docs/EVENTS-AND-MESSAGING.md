@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 0.1 (draft) |
-| **Date** | 2026-10-27 |
+| **Version** | 0.2 (draft) |
+| **Date** | 2026-11-11 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Related: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md), [GUI-PLAN.md](./GUI-PLAN.md) |
+
+**Changes in 0.2:** v1 runs on one VM (spec §8). The rating worker uses a Pub/Sub **pull** subscription instead of push to Cloud Run (§7.1). The inbox is keyed per consumer, and per-round results go to `match_round_players` ([DATABASE.md](./DATABASE.md)). Integration tests use the compose file from CI instead of testcontainers (§11).
 
 This document covers how events are produced, transported and handled across the system, whether a message queue is needed, and how match results turn into ELO ratings reliably.
 
@@ -15,14 +17,14 @@ This document covers how events are produced, transported and handled across the
 | Question | Decision |
 |---|---|
 | Do we need a message queue? | **Yes, but only for durable domain events** (match results → stats/ELO/analytics). |
-| Which one? | **Google Cloud Pub/Sub** (managed, global, durable, has dead-letter topics, pushes to Cloud Run, has a BigQuery sink). |
+| Which one? | **Google Cloud Pub/Sub** (managed, global, durable, has dead-letter topics and a BigQuery sink, nothing to operate on the v1 VM). |
 | Queue for in-game events? | **No.** They stay in-process (Go channels / ring buffers) and go straight onto the client socket. A broker would add tens of ms and gives no benefit. |
 | Queue for lobby updates? | **No.** v1 uses an in-process hub. v2 uses Redis pub/sub. These updates are ephemeral and only the latest value matters. |
 | Push "your rating changed" to clients? | PostgreSQL **`LISTEN/NOTIFY`**, sent from inside the rating transaction, so it fires only when the change is committed. |
 | Delivery guarantee | **At-least-once** delivery + **idempotent consumers** (inbox table) = exactly-once **effect**. |
 | Producer with a database (API) | **Transactional outbox** (introduced when the first consumer of user events exists, see §6.2). |
 | Producer without a database (game server) | **Publish directly with a bounded local spool**, and flush on shutdown. |
-| Database | **PostgreSQL 17** (Cloud SQL). It is the only system of record. Pub/Sub is transport, not storage. |
+| Database | **PostgreSQL 17** (a container on the v1 VM, Cloud SQL in v2). It is the only system of record. Pub/Sub is transport, not storage. |
 
 ---
 
@@ -135,11 +137,13 @@ When a match ends, several things must happen: write the match and its players, 
 
 | Option | Managed on GCP | Durability / DLQ | Ops effort | Fit |
 |---|---|---|---|---|
-| **Cloud Pub/Sub** | ✅ fully | ✅ / ✅ built-in | Very low | **Chosen.** Native GCP: push to Cloud Run, BigQuery subscriptions, global topics, IAM, emulator for dev. |
+| **Cloud Pub/Sub** | ✅ fully | ✅ / ✅ built-in | Very low | **Chosen.** Native GCP: pull or push subscriptions, BigQuery subscriptions, global topics, IAM, emulator for dev. Nothing extra runs on the v1 VM. |
 | Redis Streams (Memorystore) | ✅ | ⚠ memory-bound, persistence options limited / manual DLQ | Medium | Good for ephemeral fan-out (we use Redis pub/sub for the lobby in v2), weak as a durable record. |
 | NATS JetStream | ❌ self-host on GKE | ✅ / manual | High | Excellent latency, but the operations burden is not justified at our volume. |
 | Managed Service for Apache Kafka | ✅ | ✅ / manual | Medium-high, costly baseline | Overkill: our volume is thousands of events per day, not millions per second. |
-| PostgreSQL as a queue (outbox + `SKIP LOCKED`) | ✅ (Cloud SQL) | ✅ / manual | Low | Fine for single-region producers that already have a DB, but the game server has **no** DB and multi-region makes it awkward. We use this pattern only as the **outbox** feeding Pub/Sub. |
+| PostgreSQL as a queue (outbox + `SKIP LOCKED`) | ✅ (it's our DB) | ✅ / manual | Low | Fine for single-region producers that already have a DB, but the game server has **no** DB and multi-region makes it awkward. We use this pattern only as the **outbox** feeding Pub/Sub. |
+
+**Why keep a queue when v1 is one server?** In v1 the database runs on the same VM as the game server, so Pub/Sub does not protect against losing the machine. It still pays off: the game server keeps no DB credentials and never waits on the DB, results survive database restarts, migrations and a full restore (they wait in the subscription for up to 7 days), the rating logic has one owner, and moving to v2 (several game servers, Cloud SQL) changes nothing in this pipeline.
 
 **Cost estimate:** about 5k matches/day × about 3 KB = about 15 MB/day. That is well inside Pub/Sub's free tier (10 GiB/month), so the queue is effectively free at launch scale.
 
@@ -178,7 +182,7 @@ The **data** is JSON, validated against a **Protobuf schema attached to the topi
 
 | Event | Producer | Topic | Consumers (subscriptions) | Status |
 |---|---|---|---|---|
-| `match.finished.v1` | Game server (MatchRecorder) | `match-events` | `rating-worker` (push → Cloud Run), `match-events-bq` (BigQuery) | **v1** |
+| `match.finished.v1` | Game server (MatchRecorder) | `match-events` | `rating-worker` (pull), `match-events-bq` (BigQuery, optional) | **v1** |
 | `match.aborted.v1` | Game server (drain timeout, all players left during countdown…) | `match-events` | `match-events-bq` (audit). Never rated. | v1 |
 | `user.registered.v1` | API service (outbox) | `user-events` | *(future)* welcome email, analytics | v1.1 |
 | `user.deleted.v1` | API service (outbox) | `user-events` | Analytics erasure (GDPR) | v1.1 |
@@ -277,16 +281,17 @@ COMMIT;
 
 | Setting | Value |
 |---|---|
-| Subscription | `rating-worker` on `match-events`, **push** to the Cloud Run service `rating-worker` at `/pubsub/match-events` |
-| Auth | **OIDC token** from a dedicated service account. Cloud Run requires authentication. |
-| Ack | HTTP 2xx = ack. Non-2xx or timeout = nack and retry. |
-| Ack deadline | 60 s |
+| Subscription | `rating-worker` on `match-events`, **pull** (streaming pull with the official Go client, `sub.Receive`) |
+| Why pull | The worker runs inside the VM with no public endpoint, so there is nothing for Pub/Sub to push to. Pull also gives flow control for free. |
+| Auth | The VM's service account (subscriber role on this subscription only). Locally the emulator needs no auth. |
+| Ack | The handler returns → `msg.Ack()` after the transaction commits. An error → `msg.Nack()`, and the retry policy applies. |
+| Ack deadline | 60 s (the client library extends it automatically while a message is being processed) |
 | Retry policy | Exponential backoff from 10 s to 600 s |
 | Dead letter | After **10** delivery attempts → `match-events-dlq`. An alert fires on any message there. |
 | Retention | 7 days |
-| Concurrency | Cloud Run max instances 3, concurrency 10. Row locks serialize the conflicting updates (§7.3). |
+| Concurrency | `ReceiveSettings.MaxOutstandingMessages = 10`. Row locks serialize the conflicting updates (§7.3). |
 
-Pub/Sub's *exactly-once delivery* feature applies to pull subscriptions only, and it is not needed here: **the inbox makes processing idempotent no matter how the message is delivered.**
+Pub/Sub's *exactly-once delivery* option is available for pull subscriptions, but it is not needed here: **the inbox makes processing idempotent no matter how the message is delivered.**
 
 ### 7.2 Processing transaction (idempotent, atomic)
 
@@ -297,7 +302,7 @@ BEGIN;  -- READ COMMITTED is sufficient: rating rows are locked explicitly
 INSERT INTO processed_events (consumer, event_id, event_type)
 VALUES ('rating-worker', $ce_id, 'match.finished.v1')
 ON CONFLICT DO NOTHING;
--- 0 rows inserted → duplicate delivery → COMMIT and ack (HTTP 204). Done.
+-- 0 rows inserted → duplicate delivery → COMMIT and Ack. Done.
 
 -- 2. Persist the match (only if ≥ 1 registered player; guest-only matches go to BigQuery only)
 INSERT INTO matches (...) VALUES (...);
@@ -341,9 +346,9 @@ COMMIT;
 
 | Error | Handling |
 |---|---|
-| DB unavailable / timeout | Return 503 → Pub/Sub retries with backoff. Nothing is lost. |
-| Serialization or deadlock (should not happen) | Retry inside the worker up to 3 times, then 503. |
-| Invalid payload (schema passes, but semantically invalid, e.g. unknown slot) | Log at ERROR and return 400 → it ends up in the DLQ after the maximum number of attempts. It is fixed and replayed manually: `cmd/worker dlq-replay` republishes from the DLQ to the main topic. |
+| DB unavailable / timeout | `Nack` → Pub/Sub redelivers with backoff. Nothing is lost. |
+| Serialization or deadlock (should not happen) | Retry inside the worker up to 3 times, then `Nack`. |
+| Invalid payload (schema passes, but semantically invalid, e.g. unknown slot) | Log at ERROR, report to Sentry and `Nack` → it ends up in the DLQ after the maximum number of attempts. It is fixed and replayed manually: `cmd/worker dlq-replay` republishes from the DLQ to the main topic. |
 | Bug in the ELO code | DLQ + alert. After the fix, the messages are replayed. The inbox prevents double application for messages that were already processed. |
 
 ---
@@ -363,7 +368,7 @@ rating-worker ──COMMIT──► PostgreSQL NOTIFY 'rating_updated'
 
 - `NOTIFY` is **transactional** (sent only on commit) and **not durable**: a listener that is disconnected misses it. This is acceptable for a UI hint:
   - The results screen shows "rating updating…".
-  - If no push arrives within **5 s**, the client calls `GET /api/me` once.
+  - If no push arrives within **5 s**, the client calls `AccountService.GetMe` (gRPC) once.
   - The profile page always reads from the database.
 - Each game server keeps **one** dedicated listener connection, which reconnects with backoff. The payload is far below Postgres's 8,000-byte NOTIFY limit.
 - **v2 multi-region:** remote game servers LISTEN across regions. Latency does not matter for this path, and it costs one connection per pod. If the connection count becomes a problem, the worker can publish to Redis `notify:user:{id}` instead.
@@ -381,13 +386,14 @@ rating-worker ──COMMIT──► PostgreSQL NOTIFY 'rating_updated'
 
 | Scenario | Effect | Recovery |
 |---|---|---|
-| Cloud SQL down / failover | Games keep running. Ratings and profiles are delayed. Login/register (API) fails. | Pub/Sub keeps `match.finished` for up to 7 days, and the worker catches up automatically. |
+| Database down / restarting / being restored | Games keep running. Ratings and profiles are delayed. Login/register (API) fails. | Pub/Sub keeps `match.finished` for up to 7 days, and the worker catches up automatically. |
+| v1 VM down | Everything is down: running matches are lost (unrated), and no new games start. Already-published results are safe in Pub/Sub. | Restart the VM, or create a new one from the latest disk snapshot (CI-CD §6.3). The worker then drains the subscription. |
 | Pub/Sub publish errors | Events wait in the game server spool. | Retried with backoff. An alert fires if the spool stays non-empty. |
 | Game server crash **during** a best-of-3 match | The whole match is lost, including rounds already finished. No event is produced and no rating changes. Players reconnect and see "match interrupted". | None needed (fair to everyone). It is visible in the `arena_crash_total` metric. |
 | Game server crash **after** the match ended, before the publish was acknowledged | The match result is lost, so the match is unrated. | Accepted risk (§6.1). It is monitored. |
 | Duplicate delivery | None | Inbox `ON CONFLICT DO NOTHING`. |
 | Worker bug / poison message | The message is retried, then moved to the DLQ. Other matches continue processing. | Fix, then `dlq-replay`. |
-| `NOTIFY` missed | The results screen doesn't show the delta right away. | The client falls back to `GET /api/me` after 5 s. |
+| `NOTIFY` missed | The results screen doesn't show the delta right away. | The client falls back to `AccountService.GetMe` after 5 s. |
 | Client misses game events (gap) | The client stops applying events. | `resync` → `FULL_STATE` (§3.2). |
 | Client reconnects within 10 s | None visible | Event replay from the ring buffer (§3.1). |
 
@@ -397,16 +403,16 @@ rating-worker ──COMMIT──► PostgreSQL NOTIFY 'rating_updated'
 
 | Signal | Source | Alert |
 |---|---|---|
-| `pubsub_publish_latency_ms` | Game server | p99 > 500 ms |
-| `pubsub_spool_depth` | Game server | > 0 for 5 min |
-| `subscription/oldest_unacked_message_age` | Cloud Monitoring (Pub/Sub) | > 60 s |
+| `pubsub_publish_latency_ms` | Game server (Prometheus) | p99 > 500 ms |
+| `pubsub_spool_depth` | Game server (Prometheus) | > 0 for 5 min |
+| `subscription/oldest_unacked_message_age` | Cloud Monitoring (Pub/Sub's own metric, alert policy there) | > 60 s |
 | `subscription/dead_letter_message_count` (DLQ) | Cloud Monitoring | > 0 |
-| `rating_processing_duration_ms` | Worker | p95 > 500 ms |
+| `rating_processing_duration_ms` | Worker (Prometheus) | p95 > 500 ms |
 | `match_end_to_rating_visible_ms` | Worker (`now − endedAt`) | p95 > 3 s |
 | `duplicate_events_total` | Worker (inbox conflicts) | Informational |
 | `client_resync_total`, `event_replay_total` | Game server | Spike |
 
-- **Tracing:** the game server starts a span `match.finish`, and the `traceparent` attribute carries it into the worker's span. One Cloud Trace view therefore covers match end → publish → rating commit → notify.
+- **Tracing:** the game server starts an OpenTelemetry span `match.finish`, and the `traceparent` attribute carries it into the worker's span. The OTel Collector exports both to Cloud Trace, so one trace view covers match end → publish → rating commit → notify.
 - **Logs** always include `matchId`, `eventId` and `arenaId`.
 
 ---
@@ -417,13 +423,13 @@ rating-worker ──COMMIT──► PostgreSQL NOTIFY 'rating_updated'
   - `postgres:17`
   - `gcr.io/google.com/cloudsdktool/google-cloud-cli` running the **Pub/Sub emulator**
   - a bootstrap script that creates the topics and subscriptions
-  - the game server, API and worker, with the worker using a pull subscription locally
+  - the game server, API and worker, with the worker using the same pull subscription code as in production
 - **Tests:**
 
   | Kind | What it checks |
   |---|---|
   | Unit | `internal/rating`: ELO math, ties, guests, K-factors, eligibility rules, floor |
   | Contract | Golden `match.finished` JSON vs the `.proto` schema; `buf breaking` in CI |
-  | Integration (testcontainers) | Deliver the same event twice → one rating change. Deliver two events out of order → consistent history. DB down → 503 → succeeds on retry. |
+  | Integration (`-tags=integration`, `server/test/compose.yaml`: Postgres 17 + Pub/Sub emulator, same as CI) | Deliver the same event twice → one rating change. Deliver two events out of order → consistent history. DB down → Nack → succeeds on redelivery. |
   | Simulation | Seeded matches produce the expected event streams (golden files) |
   | E2E | Finish a ranked match → the results screen shows the delta in < 3 s |

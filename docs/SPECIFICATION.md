@@ -2,23 +2,24 @@
 
 | | |
 |---|---|
-| **Version** | 0.7 (draft) |
-| **Date** | 2026-11-03 |
-| **Stack** | Go (backend / game server), Vue 3 (frontend), **PostgreSQL** (database), Google Cloud Platform (hosting) |
+| **Version** | 0.8 (draft) |
+| **Date** | 2026-11-11 |
+| **Stack** | Go (Gin, gRPC + buf, pgx, Goose), Vue 3 + TypeScript (Vite, Pinia, Tailwind, gRPC-Web), **PostgreSQL 17**, Envoy, Google Cloud (one Compute Engine VM in v1, Pub/Sub), GitHub Actions, OpenTelemetry + Prometheus + Sentry |
 
 Related documents:
 
 - [GUI Plan (Vue)](./GUI-PLAN.md): screens, components, rendering, input, UX.
 - [Server & Network Design](./SERVER-AND-NETWORK.md): game server internals, binary protocol, latency minimization, deployment topology.
 - [Events & Messaging](./EVENTS-AND-MESSAGING.md): event handling (in-game, notifications, domain events), the message queue decision, and the ELO pipeline.
-- [CI/CD on GCP](./CI-CD.md): Cloud Build, Artifact Registry, Cloud Deploy, Terraform pipelines.
-- [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, database access (pgx + sqlc, no ORM), a worked example and learning resources.
+- [CI/CD and v1 Deployment](./CI-CD.md): GitHub Actions, Artifact Registry, the single-VM Docker Compose deployment, and the path to GKE + Helm.
+- [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, Gin + gRPC transport, database access (pgx + sqlc, no ORM), testing with testify + mockery, a worked example and learning resources.
 - [Database Design](./DATABASE.md): the PostgreSQL schema (tables, constraints, FKs, indexes), its Go mapping, roles and migration plan.
 
 ### Changelog
 
 | Version | Changes |
 |---|---|
+| 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). Cloud Run, Cloud SQL, Cloud Deploy and **Terraform are dropped from v1**; GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
 | 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
 | 0.6 | **Go confirmed** for the backend after reviewing the alternatives (§6.2). The game rules stay in Go. The client re-implements only what it predicts (own movement and bomb placement), and **shared test vectors generated from the Go simulation** keep the two in sync. The networking code we write ourselves is listed and sized in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy). |
 | 0.5 | Confirmed 3 HP, 2–4 players and tile-by-tile movement. At the time-out, **the player with less HP loses** (§4.8.2). **EU-only regions** with EU data residency (§8.1). Added the **CI/CD on GCP** design ([CI-CD.md](./CI-CD.md)). |
@@ -43,7 +44,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 - Getting into a game takes little effort: a guest can play within 2 clicks.
 - The server is authoritative, so clients cannot cheat on positions, bombs or damage.
 - A fair, tamper-resistant **ELO rating**, where match results are **never lost** even if the database is temporarily unavailable.
-- Simple to deploy and run on GCP.
+- Simple to deploy and run: **one server in v1** (§8), with a clear path to scale out on GKE in v2.
 
 ### 1.2 Non-goals (v1)
 
@@ -460,61 +461,80 @@ E_AB = 0.50, E_AC = 0.36, E_AD = 0.64  →  ΣE = 1.50
 
 ## 6. System Architecture (summary)
 
+v1 runs everything on **one Compute Engine VM** with Docker Compose (§8). Only Pub/Sub, Cloud Storage and the logging/tracing back ends are managed services.
+
 ```
-            ┌───────────────────────────┐
- Browser ──►│ Cloud CDN + Cloud Storage │  (Vue SPA static files)
-   │        └───────────────────────────┘
-   │ HTTPS (REST)              WSS / WebTransport (game)
-   ▼                            ▼
-┌───────────────────┐   ┌──────────────────────────────┐
-│ API service (Go)  │   │ Game servers (Go)            │
-│ Cloud Run         │   │ lobby, arenas, tick loops    │
-│ auth, profiles,   │   └───┬──────────────▲───────────┘
-│ leaderboard       │       │ publish      │ LISTEN rating_updated
-└───┬───────────────┘       │ match.finished
-    │ outbox                ▼              │
-    │               ┌────────────────┐     │
-    └──────────────►│ Cloud Pub/Sub  │     │
-                    │ (domain events)│     │
-                    └───────┬────────┘     │
-                            │ push         │
-                            ▼              │
-                    ┌────────────────┐     │
-                    │ Rating worker  │─────┤
-                    │ (Go, Cloud Run)│     │
-                    └───────┬────────┘     │
-                            ▼              │
-                    ┌──────────────────────┴┐
-                    │ Cloud SQL PostgreSQL  │
-                    └───────────────────────┘
+ Browser
+   │ HTTPS: SPA files, /api/auth/* (Gin), gRPC-Web            WSS /play (game)
+   ▼                                                            │
+┌──────────────────────── GCE VM (europe-west3), docker compose ┼──────────────────────┐
+│ ┌──────────────────────────────┐                              │                      │
+│ │ Caddy: TLS, static Vue SPA,  │──────────────────────────────┘                      │
+│ │ routing                      │──── gRPC-Web ───► Envoy ── gRPC ──┐                  │
+│ └──────┬───────────────────────┘                                   ▼                  │
+│        │ HTTP (Gin)                ┌───────────────────────────────────┐              │
+│        └──────────────────────────►│ API service (Go): Gin + gRPC      │              │
+│                                    │ auth, profiles, leaderboard       │              │
+│                                    └──────────────┬────────────────────┘              │
+│ ┌──────────────────────────────┐                  │                                   │
+│ │ Game server (Go)             │                  │                                   │
+│ │ lobby, arenas, tick loops    │◄── LISTEN rating_updated ──┐                          │
+│ └──────┬───────────────────────┘                  ▼         │                          │
+│        │ publish match.finished        ┌──────────────────────┐                        │
+│        │                               │ PostgreSQL 17        │                        │
+│        │      ┌──────────────────┐     └──────────▲───────────┘                        │
+│        │      │ Rating worker    │────────────────┘                                    │
+│        │      │ (Go, pull)       │                                                     │
+│        │      └────────▲─────────┘     OTel Collector · Prometheus · Grafana           │
+└────────┼───────────────┼─────────────────────────────────────────────────────────────┘
+         ▼               │ pull
+     ┌─────────────────────────┐        Cloud Trace · Cloud Logging · Sentry (errors)
+     │ Cloud Pub/Sub           │
+     │ match-events (+ DLQ)    │
+     └─────────────────────────┘
 ```
 
 | Part | Summary | Details |
 |---|---|---|
-| **Backend** | **Go 1.25+**. A stateless **API service**, a stateful **game server** (one goroutine per arena, **60 Hz** simulation, **30 Hz** snapshots) and a **rating worker** that consumes domain events. | [Server & Network §3](./SERVER-AND-NETWORK.md#3-game-server-internals) |
+| **Backend** | **Go 1.25+**. A stateless **API service** (Gin for HTTP, gRPC for the data APIs), a stateful **game server** (one goroutine per arena, **60 Hz** simulation, **30 Hz** snapshots) and a **rating worker** that consumes domain events. | [Server & Network §3](./SERVER-AND-NETWORK.md#3-game-server-internals), [Backend Architecture](./BACKEND-ARCHITECTURE.md) |
 | **Events** | In-game events go over the socket in real time and never through a queue. **Pub/Sub** carries durable domain events (`match.finished`). Postgres `LISTEN/NOTIFY` delivers rating-update notifications. | [Events & Messaging](./EVENTS-AND-MESSAGING.md) |
-| **Network** | **Binary protocol** over WebSocket in v1. WebTransport datagrams are planned for v2. The client predicts its own movement and bombs, and draws other entities from an interpolation buffer. Players are routed to the nearest region. | [Server & Network §4–§7](./SERVER-AND-NETWORK.md#4-transport) |
-| **Database** | **PostgreSQL 17** on Cloud SQL | §7 |
-| **Frontend** | **Vue 3 + TypeScript + Vite + Pinia**. Vue handles the menus and HUD. A non-reactive game engine draws the game on a Canvas 2D at 60 FPS. | [GUI Plan](./GUI-PLAN.md) |
+| **Network** | **Binary protocol** over WebSocket in v1. WebTransport datagrams are planned for v2. The client predicts its own movement and bombs, and draws other entities from an interpolation buffer. v1 serves one region; v2 routes players to the nearest one. | [Server & Network §4–§7](./SERVER-AND-NETWORK.md#4-transport) |
+| **Database** | **PostgreSQL 17** in a container on the VM's persistent disk (v1), Cloud SQL in v2 | §7 |
+| **Frontend** | **Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind**. Vue handles the menus and HUD. A non-reactive game engine draws the game on a Canvas 2D at 60 FPS. Data calls use generated **gRPC-Web** clients. | [GUI Plan](./GUI-PLAN.md) |
+| **Operations** | **GitHub Actions** CI/CD, **OpenTelemetry** traces, **Prometheus + Grafana** metrics, **Sentry** errors | [CI/CD](./CI-CD.md) |
 
-### 6.1 REST API (API service)
+### 6.1 API (API service)
+
+The API has two faces:
+
+- **HTTP via Gin**, for the few endpoints that need browser-native HTTP: the auth endpoints set and read the `HttpOnly` refresh cookie, and health checks and the ping endpoint must be plain HTTP.
+- **gRPC services** for all data APIs. They are defined in `/protocol/api/bomberman/v1/*.proto` and managed with **buf** (lint, breaking-change check, code generation for Go and TypeScript). The browser calls them with **gRPC-Web**, and **Envoy** translates gRPC-Web to gRPC.
+
+**HTTP (Gin):**
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/auth/register` | – | Create account → tokens |
-| POST | `/api/auth/login` | – | Login → tokens |
+| POST | `/api/auth/register` | – | Create account → access token + refresh cookie |
+| POST | `/api/auth/login` | – | Login → access token + refresh cookie |
 | POST | `/api/auth/guest` | – | `{nickname?}` → guest token |
-| POST | `/api/auth/refresh` | cookie | New access token |
+| POST | `/api/auth/refresh` | cookie | New access token (rotates the refresh cookie) |
 | POST | `/api/auth/logout` | user | Revoke refresh token |
-| GET | `/api/me` | user/guest | Current identity + rating (users) |
-| GET | `/api/regions` | – | Game regions + ping endpoints |
-| GET | `/api/leaderboard?offset&limit` | – | Top players by rating (eligible only) |
-| GET | `/api/users/:username` | – | Public profile, stats, rating, tier, rank |
-| GET | `/api/users/:username/matches` | – | Paginated match history (with rating deltas) |
-| GET | `/api/users/:username/rating-history` | – | Rating over time (for the chart) |
+| HEAD | `/ping` | – | Latency probe for region selection |
 | GET | `/healthz`, `/readyz` | – | Health checks |
+| GET | `/metrics` | internal only | Prometheus scrape endpoint, not routed by Caddy |
 
-The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETWORK.md#5-binary-protocol).
+**gRPC (package `bomberman.v1`, JWT in the `authorization` metadata):**
+
+| Service | RPC | Auth | Purpose |
+|---|---|---|---|
+| `AccountService` | `GetMe` | user/guest | Current identity + rating (users) |
+| `RegionService` | `ListRegions` | – | Game regions + ping and socket URLs |
+| `LeaderboardService` | `ListLeaderboard(offset, limit)` | – | Top players by rating (eligible only) |
+| `ProfileService` | `GetProfile(username)` | – | Public profile, stats, rating, tier, rank |
+| | `ListMatches(username, cursor, limit)` | – | Paginated match history (with rating deltas) |
+| | `GetRatingHistory(username)` | – | Rating over time (for the chart) |
+
+Domain errors map to gRPC status codes (`NotFound`, `InvalidArgument`, `AlreadyExists`, `Unauthenticated`), not HTTP statuses. The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETWORK.md#5-binary-protocol); they stay on the WebSocket, because gRPC is not suited to 60 Hz game traffic in the browser.
 
 ### 6.2 Technology rationale
 
@@ -525,7 +545,7 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 - The server only runs game rules: a 21×21 grid, ≤ 4 players, a few aliens, tile-by-tile integer movement. No engine, physics or rendering is needed on the server.
 - The workload is many small concurrent arenas and many WebSocket connections. One goroutine per arena plus two per connection is cheap, and the language handles this well.
 - Garbage collection pauses are typically well under 1 ms. The simulation makes 0 allocations per tick ([Server & Network §3.2](./SERVER-AND-NETWORK.md#32-the-simulation-package-internalgame)), and one tick is 16.7 ms, so GC is far below network jitter.
-- Small static binaries start fast on Cloud Run, and one language covers the API, game server, worker and bots.
+- Small static binaries make small container images, and one language covers the API, game server, worker and bots.
 - Go is proven for game backends: Nakama and Agones are both written in Go.
 
 **The real cost, and how it is handled:** client-side prediction needs part of the rules in the browser, so that part exists in two languages. The options:
@@ -535,7 +555,7 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 | **A. Go server + TS port of the predicted rules + generated test vectors** | Kept in sync by CI | **Chosen.** Tile-by-tile movement keeps the port to roughly 300 lines. Explosions, damage, pickups and aliens are never predicted. |
 | B. Compile `internal/game` to WebAssembly for the client | One codebase | Rejected for v1: adds roughly 0.5–1 MB gzipped (less with TinyGo) and JS↔WASM friction, for a port that is small anyway. It stays possible later because the simulation is pure. |
 | C. TypeScript/Node server with **Colyseus** | Native | Rejected. Its main gains are room handling and delta state sync. We need room logic of our own anyway (best-of-3, ranked rules), and full snapshots are only about 120 B, so delta sync saves almost nothing. Colyseus also does not provide prediction or interpolation, which we would write either way. |
-| D. **Nakama** (Go game backend with authoritative matches, auth, leaderboards) | Go match handlers | Rejected for v1: it replaces our own accounts, ELO and schema design with its model. The open-source edition runs as a single node (clustering is commercial), Go plugins must be built against the exact Nakama version, and it is stateful, so it does not fit Cloud Run. Worth revisiting only if the custom networking becomes a burden. |
+| D. **Nakama** (Go game backend with authoritative matches, auth, leaderboards) | Go match handlers | Rejected for v1: it replaces our own accounts, ELO and schema design with its model. The open-source edition runs as a single node (clustering is commercial), and Go plugins must be built against the exact Nakama version. Worth revisiting only if the custom networking becomes a burden. |
 | E. Rust | WASM-shareable | Rejected: much higher effort for no benefit at this scale. |
 
 **Networking effort:** we write the networking ourselves, on top of `coder/websocket`. The parts and their rough size are listed in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy).
@@ -544,11 +564,11 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 
 ## 7. Data Model (PostgreSQL)
 
-- **Engine:** Cloud SQL for **PostgreSQL 17**. Prod runs in HA (regional) mode with automated backups and 7-day point-in-time recovery, on a private IP.
-- **Access:** IAM database authentication through the Cloud SQL Go connector and `pgxpool`.
+- **Engine:** **PostgreSQL 17**. In v1 it is the `postgres:17` container on the VM, with its data on a separate persistent disk, a nightly `pg_dump` to Cloud Storage and daily disk snapshots ([CI-CD §6.3](./CI-CD.md#63-backups)). In v2 it moves to Cloud SQL (HA, point-in-time recovery).
+- **Access:** `pgxpool` over the internal Docker network. Each service logs in with its own role and password (from Secret Manager), so table ownership is enforced by the database ([DATABASE §7](./DATABASE.md#7-roles-and-privileges)).
 - **Extensions:** `citext`.
 - **IDs:** **UUIDv7**, generated in the application. They sort by time, which keeps the indexes compact.
-- **Migrations:** `golang-migrate`, run as a Cloud Run job before each deploy.
+- **Migrations:** **Goose** SQL files, applied by the one-shot `migrate` container before each deploy.
 - **Timeouts:** `statement_timeout = 5s` for API connections.
 
 The full schema (every table, column, constraint, foreign key and index, plus the Go type mapping and migration plan) is in **[DATABASE.md](./DATABASE.md)**, which is the source of truth. Summary:
@@ -569,41 +589,44 @@ The full schema (every table, column, constraint, foreign key and index, plus th
 
 ---
 
-## 8. Deployment on GCP (summary)
+## 8. Deployment (summary)
 
-| Concern | GCP service |
-|---|---|
-| Frontend hosting | **Cloud Storage** + **Cloud CDN** (or Firebase Hosting) |
-| API service | **Cloud Run** (stateless, autoscaled) |
-| Game servers | **v1:** a single Cloud Run instance in one region. **v2:** **GKE Autopilot** in 2–3 regions. |
-| Rating worker | **Cloud Run** service behind a Pub/Sub **push** subscription (OIDC-authenticated) |
-| Message queue | **Cloud Pub/Sub**: topic `match-events` + `match-events-dlq` (v1). `user-events` is added in v1.1. |
-| Analytics (optional) | Pub/Sub → **BigQuery subscription** on `match-events` |
-| Database | **Cloud SQL for PostgreSQL 17** (HA, private IP, primary region) |
-| Arena directory / lobby pub/sub | **Memorystore for Redis** (v2) |
-| Secrets | **Secret Manager** |
-| Images / CI/CD | **Cloud Build** (CI + triggers), **Artifact Registry** (images), **Cloud Deploy** (staging → prod promotion with approval). See [CI-CD.md](./CI-CD.md). |
-| Ingress / TLS / DDoS | **External HTTPS LB** + managed certs + **Cloud Armor**. A passthrough Network LB serves WebTransport in v2. |
-| Observability | **Cloud Logging**, **Cloud Monitoring**, **Cloud Trace** (trace context propagated through events) |
-| Infra as code | **Terraform** |
-| Environments | `dev` (docker compose with Postgres + **Pub/Sub emulator**), `staging`, `prod`, each in its own GCP project, plus a shared `cicd` project for builds and images |
+**v1 is a single server.** One Compute Engine VM runs the whole stack with Docker Compose. That keeps cost, moving parts and operations small while the game finds players. Scaling out (GKE + Helm, Cloud SQL, Redis, several regions) is the v2 step and needs no game-code changes, because transport, publisher and store sit behind interfaces.
 
-The topology, why it was chosen for latency, and the scaling path are covered in [Server & Network §8](./SERVER-AND-NETWORK.md#8-deployment-topology--scaling).
+| Concern | v1 (one VM) | v2 (scale-out) |
+|---|---|---|
+| Host | **Compute Engine VM** `e2-standard-4` in `europe-west3`, Docker Compose | **GKE** with **Helm** charts, 2–3 regions |
+| Ingress / TLS | **Caddy** container (Let's Encrypt, HTTP/2 + HTTP/3), also serves the Vue SPA | GKE Gateway + managed certs + Cloud Armor; passthrough Network LB for game traffic and WebTransport |
+| gRPC-Web | **Envoy** container | Envoy (sidecar or gateway) |
+| API service | One container (Gin + gRPC) | Deployment, autoscaled |
+| Game server | One container, arenas in memory | Game pods per region + gateway (Server & Network §8.2) |
+| Rating worker | One container, Pub/Sub **pull** subscription | Deployment, same code |
+| Message queue | **Cloud Pub/Sub**: topic `match-events` + `match-events-dlq`. `user-events` is added in v1.1. | Same |
+| Analytics (optional) | Pub/Sub → **BigQuery subscription** on `match-events` | Same |
+| Database | **PostgreSQL 17** container, nightly `pg_dump` → Cloud Storage, disk snapshots | **Cloud SQL for PostgreSQL 17** (HA, PITR) |
+| Arena directory / lobby pub/sub | In-process | **Memorystore for Redis** |
+| Secrets | **Secret Manager**, fetched into a root-only `.env` at deploy time | Secret Manager via the CSI driver / Workload Identity |
+| Images / CI/CD | **GitHub Actions** (CI, release, approval via the `production` environment), **Artifact Registry**. See [CI-CD.md](./CI-CD.md). | GitHub Actions + `helm upgrade` |
+| Observability | **OpenTelemetry** → Cloud Trace, **Prometheus + Grafana** on the VM, **Sentry**, Cloud Logging (Ops Agent), external uptime check | Managed Service for Prometheus, Cloud Monitoring |
+| Infra as code | None: a short `gcloud` runbook ([CI-CD §8](./CI-CD.md#8-bootstrap-steps-one-time)) | Revisited when there are several environments |
+| Environments | `local` (Docker Compose with Postgres + **Pub/Sub emulator**) and `prod` | + `staging` |
+
+The topology, why it was chosen for latency, and the scaling path are covered in [Server & Network §8](./SERVER-AND-NETWORK.md#8-deployment-topology--scaling) and [CI-CD §9](./CI-CD.md#9-path-to-v2-scaling-up).
 
 ### 8.1 Regions (EU only)
 
 | Role | Region |
 |---|---|
-| **Primary** (v1: everything) | **`europe-west3` (Frankfurt)**: central to the EU player base. Hosts Cloud SQL, Pub/Sub worker, API, game server, Artifact Registry. |
+| **Primary** (v1: everything) | **`europe-west3` (Frankfurt)**: central to the EU player base. Hosts the VM (and with it the API, game server, worker and database), Artifact Registry and the Pub/Sub regional endpoint. |
 | v2 extra game regions | **`europe-west1` (Belgium)** for West/UK/Iberia and **`europe-central2` (Warsaw)** for Central/East. `europe-north1` (Finland) can be added for the Nordics if latency data supports it. |
-| Cloud SQL HA standby | Same region (zonal failover). A cross-region read replica / DR copy goes in `europe-west1`. |
+| v2 Cloud SQL HA standby | Same region (zonal failover). A cross-region read replica / DR copy goes in `europe-west1`. |
 
 - **Data residency (GDPR):**
   - Pub/Sub **message storage policy** is restricted to EU regions.
   - The BigQuery dataset location is `EU`.
-  - GCS buckets (replays, Terraform state, static assets origin) are `EU` / `europe-west3`.
-  - Cloud SQL backups are stored in the EU.
-  - An organization policy `gcp.resourceLocations = in:eu-locations` enforces all of this.
+  - Cloud Storage buckets (backups, replays) are `EU` / `europe-west3`, and disk snapshots use an EU storage location.
+  - Sentry is configured with its **EU data region**.
+  - The project has no organization in v1, so the `gcp.resourceLocations` org policy can't be set. Every resource is created with an explicit EU location by the runbook ([CI-CD §8](./CI-CD.md#8-bootstrap-steps-one-time)). The org policy is added if the project moves into an organization.
 - **Expected latency:** with Premium Tier, players across the EU typically see about **10–40 ms** RTT to Frankfurt. v2 regions mainly add capacity and resilience and shave the edges, such as the Iberian peninsula and the Baltics.
 
 ---
@@ -612,14 +635,15 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 - **The server is authoritative:** clients send intents only. All movement, collisions, bombs, aliens, damage and pickups are computed on the server. Client-side prediction is cosmetic, and the server corrects it.
 - **Ratings cannot be tampered with:**
-  - Only the game server's service account may publish to `match-events`.
-  - Only the rating worker's service account may write ratings.
-  - Clients never submit results.
+  - Clients never submit results. Only the game server publishes to `match-events`, and the topic is not reachable with any credential a client has.
+  - Only the rating worker's **database role** may write ratings ([DATABASE §7](./DATABASE.md#7-roles-and-privileges)).
+  - In v1 all containers share the VM's service account, so the publish restriction is enforced by code and network layout, not IAM. v2 gives each service its own identity (GKE Workload Identity), and then only the game server's service account may publish.
 - The JWT is validated when the game socket connects. The `Origin` header is checked against an allow-list.
 - Input validation and rate limits apply to REST and to the game socket (at most 90 binary messages/s: 60 commands plus pings). The server consumes exactly one command per player per tick, which makes speed hacks impossible.
 - Usernames and nicknames go through a profanity filter.
-- Only HTTPS/WSS is used. Security headers (CSP, HSTS) are set, and CORS is restricted to the frontend origin.
-- Cloud Armor rate limiting at the load balancer.
+- Only HTTPS/WSS is used. Security headers (CSP, HSTS) are set, and CORS (Caddy and Envoy) is restricted to the frontend origin.
+- Rate limiting happens in the application in v1 (per IP and per account). Cloud Armor at the load balancer comes with v2.
+- The VM exposes only ports 80 and 443. SSH goes through IAP, and Postgres, Prometheus and the internal gRPC/HTTP ports are never published.
 - Passwords are never logged, and PII stays out of logs and events. Events carry user IDs and display names only, never emails.
 
 ---
@@ -629,14 +653,14 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 | Area | Requirement |
 |---|---|
 | Latency | Your own move and bomb show on screen within **one frame** (prediction). Other entities are shown **≈ RTT/2 + 50–80 ms** behind the server. Explosions and other world events appear **≈ RTT/2 + 1 tick** after they happen on the server. In-region RTT target: p50 ≤ 40 ms. Server tick ≤ 1 ms per arena at p99. Full budget: [Server & Network §2](./SERVER-AND-NETWORK.md#2-latency-budget). |
-| Durability | Once a match result is published, it is **never lost**. It survives game server restarts and Cloud SQL outages of up to 7 days (Pub/Sub retention). |
+| Durability | Once a match result is published, it is **never lost**. It survives game server restarts and database outages of up to 7 days (Pub/Sub retention). Accounts and profiles have an RPO of 24 h in v1 (nightly backup + disk snapshots). |
 | Rating correctness | Each rating change is applied **exactly once** (at-least-once delivery + idempotent consumer). p95 time from match end to rating visible ≤ 3 s. |
 | Performance | The client renders at 60 FPS on a mid-range laptop. Bundle size ≤ 300 KB gzipped (without assets). |
-| Availability | 99.5 % monthly (v1). The game keeps running when the database is down; only ratings and profiles are delayed. |
+| Availability | 99 % monthly (v1, one VM: a VM or zone failure takes the whole game down until the VM restarts or is rebuilt from a snapshot). 99.5 % in v2. The game keeps running when the database is down; only ratings and profiles are delayed. |
 | Scalability | ≥ 200 concurrent arenas per 2 vCPU instance. |
 | Browser support | Latest 2 versions of Chrome, Firefox, Edge and Safari. |
-| Observability | Metrics: active arenas/players/aliens, tick duration and jitter, RTT per region, send queue depth, reconnects, Pub/Sub publish latency and oldest unacked message age, DLQ size, rating processing lag. Structured JSON logs (`log/slog`). |
-| Testing | Unit tests for `internal/game` (map gen invariants, blast propagation, chain reactions, pickups and caps, damage/invulnerability, alien AI, instant alien kill, drops, determinism) and `internal/rating` (ELO math, ties, guests, K-factors, eligibility). Idempotency tests for the consumer (duplicate and out-of-order delivery). Shared protocol test vectors for Go and TS. Playwright E2E with 2 clients under simulated latency. |
+| Observability | Metrics (Prometheus, through OpenTelemetry instrumentation): active arenas/players/aliens, tick duration and jitter, RTT per region, send queue depth, reconnects, Pub/Sub publish latency and oldest unacked message age, DLQ size, rating processing lag. Traces with OpenTelemetry. Errors in Sentry. Structured JSON logs (`log/slog`). |
+| Testing | Go tests use the standard `testing` package with **testify** (`require`/`assert`) and **mockery**-generated mocks for service interfaces. Unit tests for `internal/game` (map gen invariants, blast propagation, chain reactions, pickups and caps, damage/invulnerability, alien AI, instant alien kill, drops, determinism) and `internal/rating` (ELO math, ties, guests, K-factors, eligibility). Idempotency tests for the consumer (duplicate and out-of-order delivery). Shared protocol test vectors for Go and TS. Playwright E2E with 2 clients under simulated latency. |
 | Accessibility | Colorblind-safe player colors with name labels, remappable keys (see [GUI Plan](./GUI-PLAN.md#11-accessibility--i18n)). |
 
 ---
@@ -658,7 +682,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 13. After a rated best-of-3 match, every registered player's rating changes **once** according to §5.4. The delta appears on the match-end screen within 3 s, and on the profile and leaderboard. Unrated matches, private arenas and guests are never rated. There are no seasons or resets.
 14. If the same `match.finished` event is delivered twice, the rating changes only once. If the database is down at match end, the rating is applied after it recovers.
 15. Registered users' matches (with per-round detail) show up in their profile. Guests' results do not.
-16. The app is deployed to GCP through CI from `main`.
+16. The app is deployed to the v1 VM by GitHub Actions from `main`, after a manual approval.
 
 ---
 
@@ -670,11 +694,11 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 | M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, tests |
 | M3 | **Netcode** | Binary protocol + codecs (Go/TS) with shared test vectors, event sequencing and replay, WS gateway, arena tick loop, prediction and interpolation, latency simulator |
 | M4 | **GUI** | Vue app shell, canvas renderer, HUD, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
-| M5 | **Accounts & data** | Register/login/guest, JWT/refresh, PostgreSQL schema & migrations, profiles & stats |
-| M6 | **Events & ranking** | Pub/Sub topics + DLQs, match publisher with local spool, rating worker (inbox, ELO), `LISTEN/NOTIFY` push, leaderboard, outbox table (relay enabled in v1.1) |
-| M7 | **GCP deployment** | Terraform, Cloud Run, Cloud SQL, Pub/Sub, CDN, CI/CD, monitoring & alerts |
+| M5 | **Accounts & data** | Register/login/guest (Gin), JWT/refresh, PostgreSQL schema & Goose migrations, gRPC services (buf) + Envoy gRPC-Web for profiles & stats |
+| M6 | **Events & ranking** | Pub/Sub topics + DLQs, match publisher with local spool, rating worker (pull, inbox, ELO), `LISTEN/NOTIFY` push, leaderboard, outbox table (relay enabled in v1.1) |
+| M7 | **v1 deployment** | GitHub Actions CI/CD, Artifact Registry, the VM + Docker Compose stack (Caddy, Envoy, Postgres), backups, OpenTelemetry + Prometheus/Grafana + Sentry, alerts |
 | M8 | **Polish** | Sprites, animations, sound, sudden death, settings, accessibility |
-| v2 | **Scale & latency** | Multi-region GKE, Redis directory, WebTransport datagrams |
+| v2 | **Scale & latency** | GKE + Helm, Cloud SQL, multi-region game pods, Redis directory, WebTransport datagrams |
 | v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, touch controls, anti-farming |
 | Later | Not in v1 | Rating seasons / resets, co-op / PvE modes |
 
@@ -695,7 +719,8 @@ Defaults are proposed above. Please confirm or change them:
 - **Sudden death** stays. At the 3:00 time-out **the player with less HP loses**.
 - Movement is **tile-by-tile**.
 - **EU regions only** (§8.1).
+- **v1 is a single server** (one VM, Docker Compose), with no Terraform. CI/CD runs on **GitHub Actions** (§8).
 
 **Still open:**
 
-1. **License** for the public source. See [CI/CD §9](./CI-CD.md#9-open-questions). *(Git hosting is resolved: a public GitHub repository.)*
+1. **License** for the public source, the domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions).
