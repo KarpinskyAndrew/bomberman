@@ -10,8 +10,8 @@
 
 - **v1 is one server.** Everything runs on a single **Compute Engine VM** with **Docker Compose**: Caddy, Envoy, API, game server, rating worker, PostgreSQL and the observability containers. Cloud Run, Cloud SQL, Cloud Deploy, staging/prod projects and Cloud CDN are gone from v1.
 - **Terraform is dropped.** The few GCP resources v1 needs are created once with the `gcloud` commands in §8. GKE + **Helm** (and IaC, if wanted) arrive with v2 (§9).
-- **CI/CD runs on GitHub Actions** instead of Cloud Build. GitHub authenticates to GCP through **Workload Identity Federation**, so no service-account keys exist.
-- Migrations use **Goose** instead of golang-migrate.
+- **CI/CD runs on GitHub Actions**. GitHub authenticates to GCP through **Workload Identity Federation**, so no service-account keys exist.
+- Migrations use **Goose**.
 
 **Short answer:** GitHub Actions runs CI on every PR. A fast-forward of `dev` into `main` builds the images, pushes them to **Artifact Registry** and, after a manual approval, deploys them to the VM with `docker compose`. Pub/Sub, Cloud Storage, Secret Manager, Cloud Logging and Cloud Trace are the only managed GCP services v1 uses.
 

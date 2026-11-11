@@ -8,8 +8,8 @@
 
 **Changes in 0.4:**
 
-- **v1 runs on one Compute Engine VM** with Docker Compose instead of Cloud Run (§8.1). The Cloud Run 60-minute socket limit no longer applies (§7).
-- The repository layout gains `protocol/api` (gRPC, buf), `internal/grpcapi` and `deploy/`, and loses `infra/` (§3.1). HTTP routing uses **Gin** instead of chi. Migrations use **Goose**.
+- **v1 runs on one Compute Engine VM** with Docker Compose.
+- The repository layout gains `protocol/api` (gRPC, buf), `internal/grpcapi` and `deploy/`, and loses `infra/` (§3.1). HTTP routing uses **Gin**. Migrations use **Goose**.
 - Telemetry is OpenTelemetry with a Prometheus exporter, plus Sentry (§3.1, §9).
 
 **Changes in 0.3:**
