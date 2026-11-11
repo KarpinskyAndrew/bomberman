@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Version** | 0.1 (draft) |
-| **Date** | 2026-11-03 |
+| **Version** | 0.2 (draft) |
+| **Date** | 2026-11-11 |
 | **Parent** | [SPECIFICATION.md §7](./SPECIFICATION.md#7-data-model-postgresql) · [BACKEND-ARCHITECTURE.md §3–§4](./BACKEND-ARCHITECTURE.md#3-database-access-why-no-orm) · [EVENTS-AND-MESSAGING.md §6–§7](./EVENTS-AND-MESSAGING.md#6-producers) |
 
 This document is the **source of truth for the database schema**. It lists every table with its columns, required properties, keys, foreign keys, checks and indexes, explains why each one exists, and shows how the schema maps to Go types (pgx + sqlc, no ORM). Migrations in `server/internal/store/migrations/` must match it. When the schema changes, update this document in the same PR.
@@ -12,6 +12,7 @@ This document is the **source of truth for the database schema**. It lists every
 
 | Version | Changes |
 |---|---|
+| 0.2 | v1 runs PostgreSQL as a container on one VM (SPEC §8), so database roles are password login roles created by an init script instead of Cloud SQL IAM users (§7). Migrations move from golang-migrate to **Goose** (file names and `NO TRANSACTION`, §8). Housekeeping runs inside the worker (§6.1). The tables themselves are unchanged. |
 | 0.1 | First version. Builds on SPECIFICATION §7 v0.6 with these changes: per-round player results move from `match_rounds.players JSONB` into a real table, `match_round_players`. Password hashes move to `user_credentials`. Refresh tokens get rotation families and a binary hash. Matches store their full ruleset and the simulation version. The inbox is keyed per consumer. Every constraint has an explicit name. |
 
 ---
@@ -415,7 +416,7 @@ CREATE TABLE match_players (
 CREATE INDEX match_players_user_id_idx ON match_players (user_id, match_id DESC) WHERE user_id IS NOT NULL;
 ```
 
-- **Match history query** (`GET /api/users/:username/matches`): keyset pagination on `(user_id, match_id DESC)` with `match_id < $cursor`, then join `matches` by PK. UUIDv7 time order is the match start time. That's the right order for history, and it removes the need for an index on `matches(ended_at)` joined to users.
+- **Match history query** (`ProfileService.ListMatches`, SPEC §6.1): keyset pagination on `(user_id, match_id DESC)` with `match_id < $cursor`, then join `matches` by PK. UUIDv7 time order is the match start time. That's the right order for history, and it removes the need for an index on `matches(ended_at)` joined to users.
 - The partial `WHERE user_id IS NOT NULL` index also serves the `ON DELETE SET NULL` from `users`: the lookup is `user_id = $deleted`, which is never NULL.
 - `match_players_match_user_key` leads with `match_id`, so it doesn't replace `match_players_user_id_idx`.
 - `rating_check` only enforces "both or neither". It deliberately does **not** require `user_id IS NOT NULL`: deleting an account sets `user_id` to NULL on rows that have ratings, and such a CHECK would make that `ON DELETE SET NULL` fail and block the deletion. "Guests are never rated" is enforced in `internal/rating`, which never builds a `RatingChange` for a slot without a user.
@@ -550,7 +551,7 @@ CREATE TABLE rating_history (
   CONSTRAINT rating_history_delta_check   CHECK (delta = rating_after - rating_before),
   CONSTRAINT rating_history_k_check       CHECK (k_factor IN (16, 24, 40))
 );
--- Rating chart (GET /api/users/:username/rating-history), newest first
+-- Rating chart (ProfileService.GetRatingHistory), newest first
 CREATE INDEX rating_history_user_created_idx ON rating_history (user_id, created_at DESC);
 -- FK index for the matches cascade; also "who was rated in this match"
 CREATE INDEX rating_history_match_id_idx     ON rating_history (match_id);
@@ -837,7 +838,9 @@ No other indexes are planned. Add one only when a query in `internal/store/queri
 
 ## 6. Lifecycle and data retention
 
-### 6.1 Housekeeping (daily Cloud Scheduler → `cmd/worker housekeeping`)
+### 6.1 Housekeeping (daily, inside `cmd/worker`)
+
+In v1 there is exactly one worker, so it runs housekeeping itself on a daily timer (03:30 Europe/Berlin), taking a `pg_try_advisory_lock` first so an accidental second worker skips the run. In v2 this becomes a Kubernetes `CronJob` that runs `worker housekeeping`.
 
 | Table | Rule |
 |---|---|
@@ -864,29 +867,41 @@ Other players' ratings and `rating_history` are **not** recalculated.
 
 The table ownership in §1.3 is enforced in the database. That makes SPEC §9 ("only the rating worker's service account may write ratings") a fact, not a convention.
 
-| Role (IAM DB user) | Privileges |
+| Role (login role, password in Secret Manager) | Privileges |
 |---|---|
-| `migrator` | Owns the schema and all tables. Used only by the migration job. |
+| `migrator` | Owns the schema and all tables. Used only by the `migrate` container. |
 | `api` | `SELECT, INSERT, UPDATE, DELETE` on `users`, `user_credentials`, `refresh_tokens`, `outbox`. `INSERT` on `player_ratings`, `user_stats` (registration). `UPDATE (display_name)` on `match_players` (§6.2). `SELECT` on everything else. |
 | `worker` | `SELECT, INSERT, UPDATE` on `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history`, `processed_events`, `user_stats`, `player_ratings`. `DELETE` on the housekeeping tables. `SELECT` on `users`. |
 | `gameserver` | `CONNECT` only. `LISTEN rating_updated` needs no table privileges, so the game server **can't** write anything, by construction. |
 
-Grants are written in a migration (`ALTER DEFAULT PRIVILEGES` + explicit `GRANT`s), and the integration tests check that a write as `gameserver` fails.
+- **Roles** are cluster-level objects with passwords, so they are not created by a migration. In v1 `deploy/postgres/init/01-roles.sh` creates them the first time the Postgres container starts, reading the passwords from the environment (`.env`, filled from Secret Manager). The superuser `postgres` is used only by that script and by backups. In v2 the same roles are created on Cloud SQL by the runbook.
+- **Grants** are written in a migration (`ALTER DEFAULT PRIVILEGES` + explicit `GRANT`s), and the integration tests check that a write as `gameserver` fails.
 
 ---
 
 ## 8. Migration plan
 
-These are the initial migrations, in `server/internal/store/migrations/`. Each file is one logical change, and every one after the first is forward-only (CI-CD §5).
+These are the initial migrations, in `server/internal/store/migrations/`. They are **Goose** SQL files: one file per change, with a `-- +goose Up` section and a `-- +goose Down` section (the down part is for local development only). Each file is one logical change, and every one after the first is forward-only (CI-CD §5). sqlc reads the same files as its schema and ignores the down sections.
 
 | File | Content |
 |---|---|
-| `0001_extensions.up.sql` | `citext` |
-| `0002_accounts.up.sql` | `users`, `user_credentials`, `refresh_tokens` |
-| `0003_ratings_and_stats.up.sql` | `player_ratings`, `user_stats` |
-| `0004_matches.up.sql` | `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history` |
-| `0005_messaging.up.sql` | `processed_events`, `outbox` |
-| `0006_roles.up.sql` | Grants (§7). Role creation itself is in Terraform, because IAM DB users are Cloud SQL resources. |
+| `00001_extensions.sql` | `citext` |
+| `00002_accounts.sql` | `users`, `user_credentials`, `refresh_tokens` |
+| `00003_ratings_and_stats.sql` | `player_ratings`, `user_stats` |
+| `00004_matches.sql` | `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history` |
+| `00005_messaging.sql` | `processed_events`, `outbox` |
+| `00006_grants.sql` | Grants (§7). The roles themselves are created by the Postgres init script (§7). |
+
+```sql
+-- 00001_extensions.sql
+-- +goose Up
+CREATE EXTENSION IF NOT EXISTS citext;
+
+-- +goose Down
+DROP EXTENSION IF EXISTS citext;
+```
+
+Goose wraps each file in a transaction by default and records applied versions in `goose_db_version`.
 
 **Constraint tests:** the integration suite (`-tags=integration`) applies the migrations and then, for every named constraint, inserts one row that violates **only** that constraint and asserts the error's `ConstraintName`. CHECKs on nullable columns also get a NULL-case row. It also covers the cascades (account deletion, match deletion) and uses `EXPLAIN` to check that each query in §5 uses its index. This DDL was checked this way against `postgres:17` when this document was written (44 rejection cases, 2 cascade scenarios, 5 plans).
 
@@ -894,7 +909,7 @@ These are the initial migrations, in `server/internal/store/migrations/`. Each f
 
 - New column: add it as `NULL` or with a constant default, backfill in a separate step, then add `NOT NULL` with `ADD CONSTRAINT … CHECK (col IS NOT NULL) NOT VALID` + `VALIDATE CONSTRAINT`, and finally `SET NOT NULL`. PostgreSQL uses the validated check and skips the table scan.
 - New allowed enum value: add the new CHECK as `NOT VALID`, validate it, drop the old one. Ship the Go code that **reads** the value before the code that **writes** it.
-- New index on a big table: `CREATE INDEX CONCURRENTLY` as the **only statement** in its migration file. golang-migrate sends a file as one multi-statement query, PostgreSQL runs that as an implicit transaction block, and `CONCURRENTLY` can't run inside one.
+- New index on a big table: `CREATE INDEX CONCURRENTLY` in its own migration file marked `-- +goose NO TRANSACTION`, because `CONCURRENTLY` can't run inside a transaction block. Keep it the only statement in that file, so a failure can't leave half a migration applied.
 - Never rename a constraint, column or table in one step. Add the new one, move the readers and writers, then drop the old one.
 
 ---
@@ -903,15 +918,15 @@ These are the initial migrations, in `server/internal/store/migrations/`. Each f
 
 This design needs some changes in other places. Each one is additive or an internal rename:
 
-| Where | Change |
-|---|---|
-| `protocol/events` `match.finished.v1` | Add `simVersion`, the ruleset fields (`wallDensityPct`, `wallDropPct`, `aliensEnabled`, `maxAliens`), and per round `endTick`, `endReason`, plus per round player `hpLeft` and the five counters. Adding fields is backward-compatible (`buf breaking` passes), so this stays `v1`. |
-| EVENTS §7.2 | The inbox insert gets the `consumer` column. Inserts go to `match_round_players` instead of `match_rounds.players`. |
-| BACKEND-ARCHITECTURE §4 | `CreateWithRating` also inserts `user_credentials` and `user_stats`. `uuid.New()` → `uuid.NewV7()`. |
-| SPECIFICATION §7 | Points to this document instead of keeping its own DDL. |
+| Where | Change | Status |
+|---|---|---|
+| `protocol/events` `match.finished.v1` | Add `simVersion`, the ruleset fields (`wallDensityPct`, `wallDropPct`, `aliensEnabled`, `maxAliens`), and per round `endTick`, `endReason`, plus per round player `hpLeft` and the five counters. Adding fields is backward-compatible (`buf breaking` passes), so this stays `v1`. The JSON example in EVENTS §5.4 still shows the older field set. | Open: do it when the `.proto` is written (M6) |
+| EVENTS §7.2 | The inbox insert gets the `consumer` column. Inserts go to `match_round_players` instead of `match_rounds.players`. | Done |
+| BACKEND-ARCHITECTURE §4 | `CreateWithRating` also inserts `user_credentials` and `user_stats`. `uuid.New()` → `uuid.NewV7()`. | Done |
+| SPECIFICATION §7 | Points to this document instead of keeping its own DDL. | Done |
 
 ## 10. Open questions
 
-1. **Login rate limiting** (SPEC §3.3: 5 failures per 15 min per IP+account). With several API instances on Cloud Run, a per-instance in-memory counter can be bypassed by spreading requests. Options: a small `auth_failures` table (IP, account, time) with a 15-minute retention, or Memorystore once it exists in v2. **Proposal:** a table in v1, because it's cheap and needs no new infrastructure.
+1. **Login rate limiting** (SPEC §3.3: 5 failures per 15 min per IP+account). v1 has exactly one API container, so an in-memory limiter is correct there (it resets on restart, which is acceptable). With several API pods in v2, a per-instance counter can be bypassed by spreading requests. Options for v2: a small `auth_failures` table (IP, account, time) with a 15-minute retention, or Redis, which v2 brings anyway. **Proposal:** in-memory in v1, Redis in v2.
 2. **Match retention.** Keep all matches forever, or prune per-round detail (`match_round_players`) after, say, 12 months and keep only `match_players` totals? At v1 scale the data stays well under 10 GB per year, so the proposal is to keep everything until that changes.
 3. **Display names for registered users** in `match_players`: today it's a snapshot of the username at match time. If renames are ever allowed, history would show the old name. Fine for v1, because usernames are immutable.
