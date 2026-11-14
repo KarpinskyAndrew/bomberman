@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Version** | 0.9 (draft) |
-| **Date** | 2026-11-11 |
+| **Version** | 0.10 (draft) |
+| **Date** | 2026-11-14 |
 | **Stack** | Go (Gin, gRPC + buf, pgx, Goose), Vue 3 + TypeScript (Vite, Pinia, Tailwind, gRPC-Web), **PostgreSQL 17**, Envoy, Google Cloud (one Compute Engine VM in v1, Pub/Sub), GitHub Actions, OpenTelemetry + Prometheus + Sentry |
 
 Related documents:
@@ -19,6 +19,7 @@ Related documents:
 
 | Version | Changes |
 |---|---|
+| 0.10 | New **Solo mode** (§4.9): one player against the aliens, for when few players are online. Single round, never rated, open to guests; survive the 3 minutes to win, and the score is the number of aliens killed. Difficulty sets the alien count (2 / 4 / 6). "PvE-only modes" leaves the non-goals; co-op stays out. Registered players' solo runs are stored ([DATABASE 0.4](./DATABASE.md)). New acceptance criterion 17. |
 | 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. **Arena size** is a setting: Small 15×15, Medium 17×17, Large 21×21, defaulting to the player count; Ranked is always Small (§4.1). |
 | 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
 | 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
@@ -33,10 +34,11 @@ Related documents:
 
 ## 1. Overview
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a grid of 15×15 to 21×21 tiles (smaller for fewer players), place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of two game modes:
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a grid of 15×15 to 21×21 tiles (smaller for fewer players), place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of three game modes:
 
 - **Ranked:** a **1-vs-1** duel between two registered players, played as **best of 3 rounds**. The winner gains **ELO rating** and the loser loses it.
 - **Unrated:** **2–4 players**, a **single round**, just for fun.
+- **Solo:** **one player against the aliens**, a single round. There is always something to play, even when nobody else is online (§4.9).
 
 ### 1.1 Goals
 
@@ -49,7 +51,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 
 ### 1.2 Non-goals (v1)
 
-- **Co-op / PvE-only modes.** Aliens exist only inside PvP arenas.
+- **Co-op modes.** Several players teaming up against the aliens is out of scope. One player against the aliens is in scope as Solo mode (§4.9).
 - In-game chat (lobby chat is a v1.1 candidate).
 - A ranked matchmaking queue. Ranked opponents are found through the arena list, and Quick Play only *prefers* arenas with a similar rating (§5.1).
 - Spectator mode for people outside the match (eliminated players still spectate their own match).
@@ -62,7 +64,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 |---|---|
 | **Arena** | A game room. It has its own map, players, aliens and match lifecycle. |
 | **Round** | A single game: one map, from countdown to the last player standing (or a draw). |
-| **Match** | What an arena plays from start to final standings. **Ranked:** a best-of-3 series of rounds between 2 players. **Unrated:** exactly 1 round. ELO is applied per ranked match. |
+| **Match** | What an arena plays from start to final standings. **Ranked:** a best-of-3 series of rounds between 2 players. **Unrated:** exactly 1 round. **Solo:** exactly 1 round, also called a *run*. ELO is applied per ranked match. |
 | **Tile** | One cell of the arena grid (15×15, 17×17 or 21×21, §4.1). |
 | **Hard wall** | An indestructible wall. |
 | **Soft wall** | A destructible wall that is placed randomly and can be destroyed by fire. |
@@ -72,7 +74,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 | **Alien** | A computer-controlled enemy (NPC). Touching one kills a player instantly. |
 | **Tick** | One step of the server simulation (60 Hz). |
 | **Guest** | An anonymous player with no account. |
-| **Game mode** | **Ranked** (1-vs-1, registered players only, standard rules locked, best-of-3, rated) or **Unrated** (2–4 players, guests welcome, custom rules allowed, single round, never rated). Set per arena. |
+| **Game mode** | **Ranked** (1-vs-1, registered players only, standard rules locked, best-of-3, rated), **Unrated** (2–4 players, guests welcome, custom rules allowed, single round, never rated) or **Solo** (1 player against the aliens, guests welcome, single round, never rated, §4.9). Set per arena. |
 | **Rated match** | A Ranked match that meets the eligibility rules and therefore changes ELO (§5.4.2). |
 | **ELO** | A skill rating system. Everyone starts at 1200, and each rated match moves rating points between players. |
 | **Game event** | A real-time fact that happened inside an arena (bomb exploded, wall destroyed…), sent to clients. |
@@ -86,8 +88,8 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 
 | Role | Can do |
 |---|---|
-| **Guest** | Choose a nickname (or have one generated), browse all arenas, and join/create and play **Unrated** arenas. Guests see Ranked arenas in the list but **cannot join them** ("Register to play Ranked"). Stats are **not** persisted. |
-| **Registered user** | Everything a guest can do, plus **Ranked** play, a persistent profile, match history, statistics, an **ELO rating**, a leaderboard position and a reserved username. |
+| **Guest** | Choose a nickname (or have one generated), browse all arenas, join/create and play **Unrated** arenas, and play **Solo**. Guests see Ranked arenas in the list but **cannot join them** ("Register to play Ranked"). Stats are **not** persisted. |
+| **Registered user** | Everything a guest can do, plus **Ranked** play, a persistent profile, match history, statistics (including the **solo best score**), an **ELO rating**, a leaderboard position and a reserved username. |
 
 ### 3.2 Registration
 
@@ -368,6 +370,30 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
   - So rage-quitting never improves a result.
 - If only **one** player who has not forfeited is left, the match ends immediately and that player wins it.
 
+### 4.9 Solo mode (one player against the aliens)
+
+Solo mode gives a player something to do when few people are online, and a place to practice. It reuses the round simulation unchanged: the same map, bombs, collectibles, aliens, time limit and sudden death. Only the start, the end condition and the result differ.
+
+| Rule | Solo |
+|---|---|
+| Players | Exactly **1**, guest or registered |
+| Format | **Single round** (a *run*), never rated |
+| Arena | **Small 15×15**, the player spawns at P1 (1, 1). 65 % walls, 30 % wall drops. |
+| Aliens | Always on. The **difficulty** sets max aliens: **Easy 2**, **Normal 4** (default), **Hard 6**. Spawning, respawning (every 30 s up to the cap) and the type mix follow §4.7.3. |
+| Time | 3 min limit, sudden death at 2:00 (§4.8.2) |
+| **Win** | The player is **alive at 3:00** ("survived") |
+| **Loss** | The player is eliminated: alien contact, their own bomb, a sudden-death wall, the 15 s disconnect grace running out, or leaving |
+| **Score** | **Aliens killed** in the run (a Brute counts once). Shown on the result screen, next to the personal best for registered players. |
+
+- **Starting:** *Play solo* is offered on the landing page and in the lobby. The server creates a solo arena for that player and goes **straight to the 3 s COUNTDOWN**. There is no waiting room and no ready countdown (which needs 2 players, §5.2).
+- **The arena is the player's own:** it is private, is not shown in the lobby list, has no invite code and cannot be joined or spectated.
+- **Round end:** the PvP rule "the round ends when at most one player is alive" does not apply, because it would end the run on the first tick. A solo round ends only when the player is eliminated or the time limit is reached.
+- **Lifecycle:** COUNTDOWN → PLAYING → MATCH_END. The server sends `round.end` and `match.end` as in Unrated, so the client handles all modes the same way. The result screen offers **Play again** (a new run on a new map, immediately) and **Back to lobby**. The arena is destroyed when the player leaves it.
+- **One arena at a time** (§5.2) still holds: joining another arena ends a running solo run as a loss.
+- **Never rated.** Solo runs never change ELO.
+- **Persistence:** a registered player's runs appear in their match history, and the profile shows their solo runs, wins and **best score**. Solo runs do **not** count in the PvP statistics (matches played, wins, kills, deaths). Guests' runs are not stored.
+- *(v1.1 candidates: keep playing solo while waiting for an opponent to join your arena, a solo leaderboard, score weights per alien type, endless waves.)*
+
 ---
 
 ## 5. Arenas, Lobby & Ranking
@@ -376,6 +402,7 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
 
 - Shows the list of arenas with: name, **Ranked 1v1 / Unrated** badge, status (Waiting / Starting in 0:12 / **Round 2 of 3, score 1–0** / Playing / Match end), players (`n/2` ranked, `n/4` unrated), the **waiting opponent's rating** (ranked arenas), whether it is private, whether aliens are on, **region and measured ping**.
 - Actions:
+  - **Play solo:** starts a solo run against the aliens right away (§4.9), with a difficulty choice (Easy / Normal / Hard). When the arena list is empty, the lobby points to it: "Nobody is waiting right now. Play solo?"
   - **Quick Play:**
     - **Registered users** join a **ranked** WAITING arena with one player waiting, in the **lowest-ping region**, preferring an opponent within ±200 rating. If none is available, it creates a new ranked arena and waits there.
     - **Guests** join an **unrated** WAITING public arena in the lowest-ping region, preferring the fullest one, or create one.
@@ -422,7 +449,7 @@ Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 
 | Leaderboard eligibility | ≥ **10** rated matches. Before that, the player shows as "Placement n/10". |
 | Storage | Integer rating. Deltas are rounded half away from zero. |
 | Unit | **One rating update per ranked match** (the whole best-of-3), never per round |
-| Who is rated | Only **Ranked 1-vs-1** matches. Unrated matches, whatever the player count, never change rating. |
+| Who is rated | Only **Ranked 1-vs-1** matches. Unrated matches, whatever the player count, and Solo runs never change rating. |
 | Seasons | **None in v1.** The rating is permanent, and there are no resets or decay. |
 
 #### 5.4.2 When is a match rated?
@@ -551,7 +578,7 @@ The API has two faces:
 | `AccountService` | `GetMe` | user/guest | Current identity + rating (users) |
 | `RegionService` | `ListRegions` | – | Game regions + ping and socket URLs |
 | `LeaderboardService` | `ListLeaderboard(offset, limit)` | – | Top players by rating (eligible only) |
-| `ProfileService` | `GetProfile(username)` | – | Public profile, stats, rating, tier, rank |
+| `ProfileService` | `GetProfile(username)` | – | Public profile, stats (incl. solo runs, wins and best score), rating, tier, rank |
 | | `ListMatches(username, cursor, limit)` | – | Paginated match history (with rating deltas) |
 | | `GetRatingHistory(username)` | – | Rating over time (for the chart) |
 
@@ -706,6 +733,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 14. If the same `match.finished` event is delivered twice, the rating changes only once. If the database is down at match end, the rating is applied after it recovers.
 15. Registered users' matches (with per-round detail) show up in their profile. Guests' results do not.
 16. The app is deployed to the v1 VM by GitHub Actions from `main`, after a manual approval.
+17. A guest or registered player can start a **solo run** in ≤ 2 clicks and plays alone against the aliens on a 15×15 arena. The run does not end while the player is alive before 3:00. Being alive at 3:00 is a win, being eliminated is a loss, and the result screen shows the number of aliens killed. The difficulty sets the alien cap (2 / 4 / 6). Solo arenas are not listed and cannot be joined. Solo runs never change ratings or PvP statistics; a registered player's runs and best score show up in their profile.
 
 ---
 
@@ -714,7 +742,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 | # | Milestone | Content |
 |---|---|---|
 | M1 | **Core simulation** | `internal/game`: map gen, movement, bombs, fire, collectibles (incl. +Bomb), round result & placement, **match logic** (ranked best-of-3 with round points, tiebreaks and forfeits; unrated single round), determinism tests |
-| M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, tests |
+| M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, **solo mode** (§4.9), tests |
 | M3 | **Netcode** | Binary protocol + codecs (Go/TS) with shared test vectors, event sequencing and replay, WS gateway, arena tick loop, prediction and interpolation, latency simulator |
 | M4 | **GUI** | Vue app shell, canvas renderer, HUD, touch controls, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
 | M5 | **Accounts & data** | Register/login/guest (Gin), JWT/refresh, PostgreSQL schema & Goose migrations, gRPC services (buf) + Envoy gRPC-Web for profiles & stats |
@@ -723,7 +751,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 | M8 | **Polish** | Sprites, animations, sound, sudden death, settings, accessibility |
 | v2 | **Scale & latency** | GKE + Helm, Cloud SQL, multi-region game pods, Redis directory, WebTransport datagrams |
 | v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, anti-farming, ranked matchmaking queue |
-| Later | Not in v1 | Rating seasons / resets, co-op / PvE modes |
+| Later | Not in v1 | Rating seasons / resets, co-op modes |
 
 ---
 
@@ -747,6 +775,9 @@ Defaults are proposed above. Please confirm or change them:
 - **EU regions only** (§8.1).
 - **v1 is a single server** (one VM, Docker Compose), with no Terraform. CI/CD runs on **GitHub Actions** (§8).
 
+- **Solo mode** is in v1 (v0.10): one player against the aliens, survive 3 minutes, score = aliens killed.
+
 **Still open:**
 
-1. The domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions). (The license is decided: Business Source License 1.1, see `LICENSE`.)
+1. **Solo scoring and pressure** (§4.9), to be settled by playtests: is "survive 3 minutes" the right goal, should the alien types score differently, and is a 30 s respawn enough pressure on Easy?
+2. The domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions). (The license is decided: Business Source License 1.1, see `LICENSE`.)

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and Ranked (ELO) and Unrated modes. Work has started on the database layer (`server/internal/store`, `server/internal/account`); most of the design still lives only in the docs (`docs/`). The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and three modes: Ranked (1-vs-1, ELO), Unrated (2–4 players) and Solo (one player against the aliens). Work has started on the database layer (`server/internal/store`, `server/internal/account`); most of the design still lives only in the docs (`docs/`). The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
 
 | Doc | Covers |
 |---|---|

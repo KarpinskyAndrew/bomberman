@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Version** | 0.3 (draft) |
-| **Date** | 2026-11-11 |
+| **Version** | 0.4 (draft) |
+| **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md §7](./SPECIFICATION.md#7-data-model-postgresql) · [BACKEND-ARCHITECTURE.md §3–§4](./BACKEND-ARCHITECTURE.md#3-database-access-why-no-orm) · [EVENTS-AND-MESSAGING.md §6–§7](./EVENTS-AND-MESSAGING.md#6-producers) |
 
 This document is the **source of truth for the database schema**. It lists every table with its columns, required properties, keys, foreign keys, checks and indexes, explains why each one exists, and shows how the schema maps to Go types (pgx + sqlc, no ORM). Migrations in `server/internal/store/migrations/` must match it. When the schema changes, update this document in the same PR.
@@ -12,6 +12,7 @@ This document is the **source of truth for the database schema**. It lists every
 
 | Version | Changes |
 |---|---|
+| 0.4 | **Solo mode** (SPEC v0.10 §4.9), migration `00007_solo_mode.sql`. `matches.mode` gains `solo` (single round, always private, always with aliens), and `matches.result` and `match_rounds.result` gain `loss`, which only a solo run can have. `match_rounds.end_reason` gains `survived` and `eliminated`. `user_stats` gains `solo_runs`, `solo_wins` and `solo_best_score`; the existing counters stay PvP-only. No new tables, so the grants are unchanged. |
 | 0.3 | Follows SPEC v0.9: ranked is 1-vs-1 best-of-3, unrated is a single round. `matches.best_of` is now 1 or 3 and tied to `mode` (`matches_format_check`), and the standard ruleset no longer fixes `best_of`. `match_players` bounds tightened: `round_wins` 0–2, `round_points` 0–9. New column `matches.arena_size` (15 / 17 / 21); the standard ruleset is 15×15 with max 2 aliens. |
 | 0.2 | v1 runs PostgreSQL as a container on one VM (SPEC §8), so database roles are password login roles created by an init script instead of Cloud SQL IAM users (§7). Migrations move from golang-migrate to **Goose** (file names and `NO TRANSACTION`, §8). Housekeeping runs inside the worker (§6.1). The tables themselves are unchanged. |
 | 0.1 | First version. Builds on SPECIFICATION §7 v0.6 with these changes: per-round player results move from `match_rounds.players JSONB` into a real table, `match_round_players`. Password hashes move to `user_credentials`. Refresh tokens get rotation families and a binary hash. Matches store their full ruleset and the simulation version. The inbox is keyed per consumer. Every constraint has an explicit name. |
@@ -251,6 +252,10 @@ Denormalized counters for fast profile reads. Created at registration together w
 | `kills`, `alien_kills`, `walls_destroyed`, `powerups_taken`, `bombs_placed` | `INT` | no | Lifetime `Counters` (§4.2). Self-kills are not kills (SPEC §7). |
 | `deaths`, `deaths_by_alien` | `INT` | no | Per round eliminated. `deaths_by_alien` ⊆ `deaths`. |
 | `updated_at` | `TIMESTAMPTZ` | no | |
+| `solo_runs`, `solo_wins` | `INT` | no | Solo mode (SPEC §4.9): runs finished, and runs survived to the time limit. `solo_wins` ≤ `solo_runs`. |
+| `solo_best_score` | `INT` | no | Highest solo score (aliens killed in one run). Updated with `GREATEST`. |
+
+**All columns above `solo_*` count PvP matches only** (ranked and unrated). A solo run changes only the three `solo_*` columns. This keeps the win rate and the `deaths <= rounds_played` check meaningful, and totals that include solo play can still be computed from the match tables.
 
 ```sql
 CREATE TABLE user_stats (
@@ -269,6 +274,9 @@ CREATE TABLE user_stats (
   deaths           INT         NOT NULL DEFAULT 0,
   deaths_by_alien  INT         NOT NULL DEFAULT 0,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  solo_runs        INT         NOT NULL DEFAULT 0,   -- added by 00007
+  solo_wins        INT         NOT NULL DEFAULT 0,
+  solo_best_score  INT         NOT NULL DEFAULT 0,
   CONSTRAINT user_stats_pkey         PRIMARY KEY (user_id),
   CONSTRAINT user_stats_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT user_stats_matches_check CHECK (
@@ -277,7 +285,9 @@ CREATE TABLE user_stats (
   CONSTRAINT user_stats_rounds_check  CHECK (rounds_played >= 0 AND rounds_won BETWEEN 0 AND rounds_played),
   CONSTRAINT user_stats_counters_check CHECK (
     kills >= 0 AND alien_kills >= 0 AND walls_destroyed >= 0 AND powerups_taken >= 0 AND bombs_placed >= 0),
-  CONSTRAINT user_stats_deaths_check  CHECK (deaths_by_alien BETWEEN 0 AND deaths AND deaths <= rounds_played)
+  CONSTRAINT user_stats_deaths_check  CHECK (deaths_by_alien BETWEEN 0 AND deaths AND deaths <= rounds_played),
+  CONSTRAINT user_stats_solo_check    CHECK (
+    solo_runs >= 0 AND solo_wins BETWEEN 0 AND solo_runs AND solo_best_score >= 0)
 );
 ```
 
@@ -286,7 +296,7 @@ CREATE TABLE user_stats (
 
 ### 3.6 `matches`: the match aggregate root
 
-One row per finished best-of-N match that had **at least one registered player** (guest-only matches go to BigQuery only, EVENTS §7.2). Aborted matches are never stored. `id` is the game server's `matchId`, which is also the CloudEvents `ce-id`.
+One row per finished match that had **at least one registered player** (guest-only matches go to BigQuery only, EVENTS §7.2). A match is a ranked best-of-3, an unrated single round, or a **solo run** (one player against the aliens, SPEC §4.9); a guest's solo run is therefore never stored. Aborted matches are never stored. `id` is the game server's `matchId`, which is also the CloudEvents `ce-id`.
 
 | Column | Type | Null | Notes |
 |---|---|---|---|
@@ -295,19 +305,19 @@ One row per finished best-of-N match that had **at least one registered player**
 | `arena_name` | `TEXT` | no | Snapshot, 1–32 chars |
 | `region` | `TEXT` | no | GCP region, `europe-*` only (SPEC §8.1) |
 | `sim_version` | `TEXT` | no | Version of `internal/game` that ran the match. Needed to replay a round from `seed` + input log. |
-| `mode` | `TEXT` | no | `ranked` \| `unrated` |
-| `private` | `BOOLEAN` | no | Private arenas are always `unrated` |
+| `mode` | `TEXT` | no | `ranked` \| `unrated` \| `solo` |
+| `private` | `BOOLEAN` | no | Private arenas are `unrated` or `solo`. A solo arena is always private: it is never listed or joinable. |
 | **Ruleset** (value object, §4.2) | | | |
 | `ruleset` | `TEXT` | no | `standard` \| `custom` |
-| `best_of` | `SMALLINT` | no | **3** for ranked, **1** for unrated (SPEC §4.8.3) |
+| `best_of` | `SMALLINT` | no | **3** for ranked, **1** for unrated and solo (SPEC §4.8.3, §4.9) |
 | `arena_size` | `SMALLINT` | no | 15, 17 or 21 (tiles per side, SPEC §4.1). Always 15 for ranked. |
 | `wall_density_pct` | `SMALLINT` | no | 40–85 |
 | `wall_drop_pct` | `SMALLINT` | no | 0–60 |
 | `aliens_enabled` | `BOOLEAN` | no | |
-| `max_aliens` | `SMALLINT` | no | 0–8 |
+| `max_aliens` | `SMALLINT` | no | 0–8. Solo: at least 1; the difficulty sets it (2 / 4 / 6). |
 | **Outcome** | | | |
 | `rounds_played` | `SMALLINT` | no | 1..`best_of` |
-| `result` | `TEXT` | no | `win` \| `draw` (shared 1st place) |
+| `result` | `TEXT` | no | PvP: `win` \| `draw` (shared 1st place). Solo: `win` (survived) \| `loss` (eliminated). |
 | `rated` | `BOOLEAN` | no | Rating actually applied (SPEC §5.4.2). Inserted `false`, set `true` in the same transaction after ELO. |
 | **Timing** | | | |
 | `started_at`, `ended_at` | `TIMESTAMPTZ` | no | Game server clock |
@@ -341,11 +351,17 @@ CREATE TABLE matches (
   CONSTRAINT matches_arena_check       CHECK (length(arena_id) BETWEEN 1 AND 16 AND length(arena_name) BETWEEN 1 AND 32),
   CONSTRAINT matches_region_check      CHECK (region ~ '^europe-[a-z]+[0-9]+$'),
   CONSTRAINT matches_sim_version_check CHECK (length(sim_version) BETWEEN 1 AND 64),
-  CONSTRAINT matches_mode_check        CHECK (mode IN ('ranked', 'unrated')),
+  CONSTRAINT matches_mode_check        CHECK (mode IN ('ranked', 'unrated', 'solo')),
   CONSTRAINT matches_ruleset_check     CHECK (ruleset IN ('standard', 'custom')),
-  CONSTRAINT matches_result_check      CHECK (result IN ('win', 'draw')),
-  -- Ranked is always best-of-3, unrated always a single round (SPEC §4.8.3)
-  CONSTRAINT matches_format_check      CHECK ((mode = 'ranked' AND best_of = 3) OR (mode = 'unrated' AND best_of = 1)),
+  CONSTRAINT matches_result_check      CHECK (result IN ('win', 'draw', 'loss')),
+  -- Ranked is best-of-3; unrated and solo are a single round (SPEC §4.8.3, §4.9)
+  CONSTRAINT matches_format_check      CHECK (
+    (mode = 'ranked' AND best_of = 3) OR (mode IN ('unrated', 'solo') AND best_of = 1)),
+  -- A solo arena is never listed or joinable, and it always has aliens
+  CONSTRAINT matches_solo_check        CHECK (mode <> 'solo' OR (private AND aliens_enabled AND max_aliens >= 1)),
+  -- Solo ends in win or loss, never a draw; PvP ends in win or draw, never a loss
+  CONSTRAINT matches_solo_result_check CHECK (
+    CASE WHEN mode = 'solo' THEN result IN ('win', 'loss') ELSE result IN ('win', 'draw') END),
   CONSTRAINT matches_rounds_check      CHECK (rounds_played BETWEEN 1 AND best_of),
   CONSTRAINT matches_rule_values_check CHECK (
     arena_size IN (15, 17, 21)
@@ -364,7 +380,8 @@ CREATE TABLE matches (
 CREATE INDEX matches_ended_at_idx ON matches (ended_at DESC);
 ```
 
-- The rules that depend on players (a ranked match has exactly 2 players, both registered) are checked by `internal/rating` in Go. A CHECK can't look at other rows.
+- The rules that depend on players (a ranked match has exactly 2 players, both registered; a solo run has exactly 1 player in slot 1) are checked in Go. A CHECK can't look at other rows.
+- The DDL above is the current state. `00004_matches.sql` created the table, and `00007_solo_mode.sql` widened `mode_check`, `result_check` and `format_check` and added the two `solo` checks. A solo run can be `ruleset = 'standard'` (Easy on a Small arena has exactly the standard values) or `custom`.
 - `arena_id` and `arena_name` are snapshots. Arenas exist only in memory (SPEC §7), so there is nothing to reference.
 
 ### 3.7 `match_players`: one row per roster slot
@@ -376,7 +393,7 @@ CREATE INDEX matches_ended_at_idx ON matches (ended_at DESC);
 | `user_id` | `UUID` | **yes** | FK → `users.id`, **set null**. NULL = guest, or a user who was later deleted. |
 | `display_name` | `TEXT` | no | Name shown in that match (snapshot). Replaced with `Deleted player` when the account is deleted (§6.2). |
 | **Standing** | | | |
-| `placement` | `SMALLINT` | no | **Match** placement 1–4 (SPEC §4.8.3; 1–2 in ranked). Ties share a value. |
+| `placement` | `SMALLINT` | no | **Match** placement 1–4 (SPEC §4.8.3; 1–2 in ranked; always 1 in solo). Ties share a value. |
 | `round_wins` | `SMALLINT` | no | 0–2 (first to 2 wins the ranked best-of-3) |
 | `round_points` | `SMALLINT` | no | 0–9 (3 points × at most 3 rounds) |
 | `forfeited` | `BOOLEAN` | no | |
@@ -436,9 +453,9 @@ CREATE INDEX match_players_user_id_idx ON match_players (user_id, match_id DESC)
 | `started_at` | `TIMESTAMPTZ` | no | |
 | `duration_ms` | `INT` | no | 0–200,000 (3:00 + slack) |
 | `end_tick` | `INT` | no | Tick on which the round ended, ≥ 0. Lets you check `eliminated_tick` values. |
-| `result` | `TEXT` | no | `win` \| `draw` |
-| `end_reason` | `TEXT` | no | `last_standing` \| `timeout_hp` \| `simultaneous` |
-| `winner_slot` | `SMALLINT` | **yes** | FK → `match_players (match_id, slot)`. Set ⇔ `result = 'win'`. |
+| `result` | `TEXT` | no | `win` \| `draw` \| `loss` (solo only) |
+| `end_reason` | `TEXT` | no | PvP: `last_standing` \| `timeout_hp` \| `simultaneous`. Solo: `survived` (alive at the time limit, a win) \| `eliminated` (a loss). |
+| `winner_slot` | `SMALLINT` | **yes** | FK → `match_players (match_id, slot)`. Set ⇔ `result = 'win'`. NULL for a draw and for a solo loss. |
 | `input_log_uri` | `TEXT` | **yes** | `gs://…` replay file. NULL = not recorded. |
 
 ```sql
@@ -458,16 +475,21 @@ CREATE TABLE match_rounds (
   CONSTRAINT match_rounds_winner_fkey      FOREIGN KEY (match_id, winner_slot) REFERENCES match_players (match_id, slot),
   CONSTRAINT match_rounds_round_no_check   CHECK (round_no BETWEEN 1 AND 3),
   CONSTRAINT match_rounds_timing_check     CHECK (duration_ms BETWEEN 0 AND 200000 AND end_tick >= 0),
-  CONSTRAINT match_rounds_result_check     CHECK (result IN ('win', 'draw')),
-  CONSTRAINT match_rounds_end_reason_check CHECK (end_reason IN ('last_standing', 'timeout_hp', 'simultaneous')),
+  CONSTRAINT match_rounds_result_check     CHECK (result IN ('win', 'draw', 'loss')),
+  CONSTRAINT match_rounds_end_reason_check CHECK (
+    end_reason IN ('last_standing', 'timeout_hp', 'simultaneous', 'survived', 'eliminated')),
   CONSTRAINT match_rounds_winner_check     CHECK ((result = 'win') = (winner_slot IS NOT NULL)),
   CONSTRAINT match_rounds_simultaneous_check CHECK (end_reason <> 'simultaneous' OR result = 'draw'),
+  -- solo (00007): eliminated ⇔ loss, and survived ⇒ win
+  CONSTRAINT match_rounds_solo_end_check   CHECK (
+    (end_reason = 'eliminated') = (result = 'loss') AND (end_reason <> 'survived' OR result = 'win')),
   CONSTRAINT match_rounds_input_log_check  CHECK (input_log_uri IS NULL OR input_log_uri LIKE 'gs://%')
 );
 ```
 
 - `winner_fkey` is a **composite FK**, so the winner must be a slot of the *same* match. With the default `MATCH SIMPLE`, a NULL `winner_slot` (a draw) skips the check. It has no `ON DELETE` action: rows are only deleted through the `matches` cascade, which removes both sides in the same statement, and `NO ACTION` is checked at the end of the statement.
-- `round_no <= matches.rounds_played` is a cross-table rule, so it's checked in Go.
+- `round_no <= matches.rounds_played` is a cross-table rule, so it's checked in Go. So is "`survived` and `eliminated` appear only in solo matches".
+- In a solo round, `match_round_players` has one row: placement 1, 3 points for a win and 0 for a loss. Dying to your own bomb is `death_cause = 'bomb'` with `killer_slot = slot`.
 
 ### 3.9 `match_round_players`: per-round result per player
 
@@ -740,10 +762,10 @@ type Match struct {
 }
 
 type (
-    Mode        string // ranked | unrated
+    Mode        string // ranked | unrated | solo
     RulesetName string // standard | custom
-    Result      string // win | draw
-    EndReason   string // last_standing | timeout_hp | simultaneous
+    Result      string // win | draw | loss (loss: solo only)
+    EndReason   string // last_standing | timeout_hp | simultaneous | survived | eliminated (last two: solo only)
     DeathCause  string
     AlienType   string
 )
@@ -896,6 +918,7 @@ These are the initial migrations, in `server/internal/store/migrations/`. They a
 | `00004_matches.sql` | `matches`, `match_players`, `match_rounds`, `match_round_players`, `rating_history` |
 | `00005_messaging.sql` | `processed_events`, `outbox` |
 | `00006_grants.sql` | Grants (§7). The roles themselves are created by the Postgres init script (§7). |
+| `00007_solo_mode.sql` | Solo mode: wider `mode`, `result`, `format` and `end_reason` checks, the solo checks, and the `user_stats.solo_*` columns. It drops and re-adds the widened CHECKs in one transaction, which is fine while the tables are empty (before the first production deploy); on a table with data, use the `NOT VALID` + `VALIDATE` steps below. |
 
 ```sql
 -- 00001_extensions.sql

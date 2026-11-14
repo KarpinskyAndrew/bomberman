@@ -110,6 +110,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 │                 (animated demo arena in background)            │
 │                                                                │
 │                   [ ▶  PLAY AS GUEST        ]                  │
+│                   [ 👾 PLAY SOLO            ]                  │
 │                   [    LOG IN               ]                  │
 │                   [    REGISTER             ]                  │
 │                                                                │
@@ -145,6 +146,13 @@ Login, register, guest nickname, create arena, join by code and settings are **m
   - their Quick Play button reads "⚡ QUICK PLAY" and joins an unrated arena;
   - Ranked rows show a lock instead of [JOIN], and clicking one opens a "Register to play Ranked" prompt.
 - Ranked rows show a tooltip "1-vs-1 · best of 3 · standard rules · rated".
+- **Solo mode** (SPEC §4.9):
+  - a **[ 👾 PLAY SOLO ]** button sits next to Quick Play, and also on the Landing page, where it creates a guest identity first if needed;
+  - it opens a small difficulty choice (Easy / Normal / Hard) and then goes straight to the in-game countdown, with no waiting room;
+  - when the arena list is empty, the empty state reads "Nobody is waiting right now. Play solo?";
+  - the match-end overlay shows "Survived!" or "Eliminated", the score (aliens killed), the personal best for registered players, and **[Play again]** / **[Back to lobby]**;
+  - solo arenas never appear in the arena list.
+  - *The mockups in `docs/mockups/` don't show these yet.*
 
 ### 4.3 Create Arena (modal)
 

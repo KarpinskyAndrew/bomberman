@@ -226,7 +226,9 @@ The **data** is JSON, validated against a **Protobuf schema attached to the topi
 
 The example is a ranked 1-vs-1. An unrated match has the same shape with `"mode": "unrated"`, `"bestOf": 1`, 2–4 players (guests have `"userId": null, "registered": false`) and exactly one entry in `rounds`.
 
-- **One event per match** (ranked best-of-3 or unrated single round), published at MATCH_END. Rounds are **not** published one at a time: rating is per match, and a half-finished match must never be partially persisted.
+A **solo run** (SPEC §4.9) also has the same shape: `"mode": "solo"`, `"private": true`, `"bestOf": 1`, one player in slot 1 and one round. Its `result` is `"win"` (survived) or `"loss"` (eliminated), the round's `endReason` is `"survived"` or `"eliminated"`, and `winnerSlot` is `null` for a loss. The score is the player's `alienKills`.
+
+- **One event per match** (ranked best-of-3, unrated single round or solo run), published at MATCH_END. Rounds are **not** published one at a time: rating is per match, and a half-finished match must never be partially persisted.
 - If the match is aborted (server drain or crash, see §9), no `match.finished` is published. If possible a `match.aborted` is published instead, and it is never rated.
 
 ---
@@ -309,6 +311,8 @@ INSERT INTO match_rounds (...) VALUES (...), (...), (...);   -- one row per roun
 INSERT INTO match_round_players (...) VALUES (...), ...;      -- one row per round × slot (DATABASE.md §3.9)
 INSERT INTO user_stats (...) VALUES (...)
   ON CONFLICT (user_id) DO UPDATE SET matches_played = user_stats.matches_played + 1, ...;
+--   A solo run (mode = 'solo') updates only solo_runs, solo_wins and
+--   solo_best_score = GREATEST(solo_best_score, $alien_kills); the PvP counters stay untouched (DATABASE.md §3.5).
 
 -- 3. ELO (only if rated per spec §5.4.2, decided by internal/rating: ranked, exactly 2 registered players)
 SELECT user_id, rating, rated_matches
