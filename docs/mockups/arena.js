@@ -9,7 +9,8 @@
      cover,                    // true: fill the whole host (background); false: fit inside it
      zoom,                     // optional tile-size multiplier (shows only the middle of the arena)
      players: [{ x, y, color, name, dir, blink, dead }],
-     aliens:  [{ type: 'drifter'|'seeker'|'brute', x, y, locked, target: [x, y], hp, blink }],
+     aliens:  [{ type: 'drifter'|'seeker'|'brute', x, y, hp, blink,
+                 locked, target: [x, y] }],   // optional: red Seeker eye looking at a tile; unused while alien behavior is undecided
      bombs:   [{ x, y, fast }],
      fires:   [{ x, y, range }],
      items:   [{ x, y, kind: 'health'|'fire'|'bomb' }],
@@ -381,21 +382,6 @@
     }
   }
 
-  function drawLock(ctx, a, t, time) {
-    if (!a.locked || !a.target) return;
-    const p = t / 8;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,70,80,.75)';
-    ctx.lineWidth = Math.max(1, p * 0.5);
-    ctx.setLineDash([p * 1.2, p * 1]);
-    ctx.lineDashOffset = -time / 40;
-    ctx.beginPath();
-    ctx.moveTo((a.x + 0.5) * t, (a.y + 0.5) * t);
-    ctx.lineTo((a.target[0] + 0.5) * t, (a.target[1] + 0.5) * t);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   /* ---------- modern (v2) painter ---------- */
   function glowOn(ctx, color, blur) { ctx.shadowColor = color; ctx.shadowBlur = blur; }
   function glowOff(ctx) { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; }
@@ -727,22 +713,6 @@
     ctx.restore();
   }
 
-  function mLock(ctx, a, t, time) {
-    if (!a.locked || !a.target) return;
-    ctx.save();
-    glowOn(ctx, MOD.lock, t * 0.2);
-    ctx.strokeStyle = 'rgba(255,59,92,.85)';
-    ctx.lineWidth = Math.max(1, t / 22);
-    ctx.lineCap = 'round';
-    ctx.setLineDash([t * 0.12, t * 0.14]);
-    ctx.lineDashOffset = -time / 40;
-    ctx.beginPath();
-    ctx.moveTo((a.x + 0.5) * t, (a.y + 0.5) * t);
-    ctx.lineTo((a.target[0] + 0.5) * t, (a.target[1] + 0.5) * t);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   function renderModern(ctx, scene, t, time) {
     ctx.imageSmoothingEnabled = true;
     const map = scene._map, n = scene._n;
@@ -785,7 +755,6 @@
     scene._fire.forEach(f => mFire(ctx, f, t, time));
     (scene.aliens || []).forEach(a => mHalo(ctx, a, t, time));
     (scene.bombs || []).forEach(b => mBomb(ctx, b, t, time));
-    (scene.aliens || []).forEach(a => mLock(ctx, a, t, time));
     (scene.aliens || []).forEach(a => mAlien(ctx, a, t, time));
     (scene.players || []).forEach(pl => mPlayer(ctx, pl, t, time, scene.names));
   }
@@ -845,7 +814,6 @@
     scene._fire.forEach(f => drawFire(ctx, f, t, time));
     (scene.aliens || []).forEach(a => drawHalo(ctx, a, t, time));
     (scene.bombs || []).forEach(b => drawBomb(ctx, b, t, time));
-    (scene.aliens || []).forEach(a => drawLock(ctx, a, t, time));
     (scene.aliens || []).forEach(a => drawAlien(ctx, a, t, time));
     (scene.players || []).forEach(pl => drawPlayer(ctx, pl, t, time, scene.names));
   }

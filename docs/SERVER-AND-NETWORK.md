@@ -130,6 +130,11 @@ The simulation is **pure and deterministic**: `State + []Command → State' + []
   10. Advance sudden death.
   11. Check win conditions.
 - Entities live in **fixed-size arrays/slices** that are preallocated per match: grid `[21*21]Tile` (sized for the largest arena; smaller arenas use the top-left `size × size` part and a `size` field, so the array never changes shape), players `[4]Player`, aliens `[16]Alien`, bombs `[32]Bomb`, items `[64]Item`. Steady-state ticks therefore make **0 allocations**, which is enforced by `testing.AllocsPerRun` benchmarks.
+- **Alien movement is a strategy** (`internal/game/ai`), because the behaviors are still open (SPEC §4.7.1):
+  - A behavior is one small interface: given a read-only view of the round, the alien and the round's PRNG, it returns the direction for the alien's next tile. It never changes the state itself.
+  - Each alien type is mapped to a behavior in the `Ruleset`, so swapping "random walk" for "pursue" or a smarter planner is a configuration change, and two behaviors can be compared in playtests.
+  - Every behavior follows the simulation rules: deterministic, integer math, randomness only from the round's PRNG, no allocations (scratch space such as the BFS queue is preallocated per round), and called in alien id order (step 3 above).
+  - Behaviors decide **movement only**. What an alien can do (kill on contact, take fire damage, pick up items or not) stays in the round rules.
 - **What the client re-implements (the prediction subset):**
   - `canEnter(tile)`, `stepMovement(player, cmd)` (start/continue/turn/stop, 9 ticks per tile) and `canPlaceBomb(player, tile)`.
   - That is roughly 300 lines of TypeScript in `web/src/game/sim/`.

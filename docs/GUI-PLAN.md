@@ -2,10 +2,14 @@
 
 | | |
 |---|---|
-| **Version** | 0.4 (draft) |
-| **Date** | 2026-11-11 |
+| **Version** | 0.5 (draft) |
+| **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Netcode: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
 | **Mockups** | [mockups/index.html](./mockups/index.html): static HTML layouts of every screen and state in §3–4 (open locally in a browser) |
+
+**Changes in 0.5:**
+
+- Removed the alien **lock-on line** (the dashed "laser" from a hunting alien to its target) from the plan and from the mockups. Alien movement is undecided (SPEC §4.7.1), so no targeting is shown. The red danger halo under every alien stays.
 
 **Changes in 0.4** (follows SPEC v0.9):
 
@@ -229,7 +233,7 @@ Login, register, guest nickname, create arena, join by code and settings are **m
 - **Killed by an alien** (instant): a short "grabbed" animation plays, the alien's portrait appears in the death banner ("Eaten by a Brute"), and then spectating starts.
 - **Lethal alien warnings** (because contact kills instantly):
   - Every alien has a faint red **danger halo** on its occupied tile.
-  - A hunting Seeker or Brute shows a **lock-on line** toward its target. The warning lives on the alien only, not on the player card: you see it in the arena faster than you would read the HUD.
+  - There is **no lock-on line** from an alien to a player (removed in 0.5). How aliens move is still open (SPEC §4.7.1), so the GUI shows no targeting. If a hunting behavior is chosen later, its warning is drawn on the alien itself (for example a red eye), never as a line across the arena or on the player card.
 - **Spectating** (after elimination): the canvas stays live with a "Spectating" banner and a [Leave arena] button.
 
 ### 4.6 Countdown, Round End & Match End overlays
@@ -473,8 +477,8 @@ export class EventDispatcher {
 | Soft wall | Brown bricks with a crack animation on hit |
 | Collectibles | ❤ red heart, 🔥 orange flame, 💣 black bomb with a "+", on a glowing round badge |
 | Drifter | Green blob, wobbling idle animation |
-| Seeker | Purple floating eye, which **turns red and leaves a trail when it locks on** to a player |
-| Brute | Red armored beast with 3 armor pips that crack as it loses HP. **Glowing eyes and a lock-on line** while hunting. |
+| Seeker | Purple floating eye. Its eye can turn red if a hunting behavior is chosen (SPEC §4.7.1). |
+| Brute | Red armored beast with 3 armor pips that crack as it loses HP, and glowing eyes |
 | Alien danger halo | A faint pulsing red tile under every alien, because contact is lethal |
 | Alien portal | A swirling ring in the alien type's color, growing over 1.5 s |
 | Sudden death | Screen border pulses red, falling-block shadow appears 0.5 s before impact |

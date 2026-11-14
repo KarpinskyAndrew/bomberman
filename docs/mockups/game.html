@@ -47,8 +47,8 @@
     </div>
     <div class="aliens-box">
       <b style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)">Aliens · <span class="cd-hide">3</span><span class="cd-only">0</span> / 4</b>
-      <span class="row"><span class="alien-dot" style="background:var(--a-drifter)"></span> Drifter <span class="dim">· wanders</span></span>
-      <span class="row"><span class="alien-dot" style="background:var(--a-seeker)"></span> Seeker <span class="dim">· hunts</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-drifter)"></span> Drifter <span class="dim">· 1 HP</span></span>
+      <span class="row"><span class="alien-dot" style="background:var(--a-seeker)"></span> Seeker <span class="dim">· 1 HP, fast</span></span>
       <span class="row"><span class="alien-dot" style="background:var(--a-brute)"></span> Brute <span class="dim">· 3 HP</span></span>
       <span class="dim" style="font-size:12px">Touching an alien kills instantly.</span>
     </div>
@@ -225,7 +225,7 @@
         { x: 11, y: 17, color: C.p4, name: 'mira', dir: 'r' }
       ],
       aliens: [
-        { type: 'seeker', x: 7, y: 5, locked: true, target: [5, 3] },
+        { type: 'seeker', x: 7, y: 5 },
         { type: 'drifter', x: 11, y: 13 },
         { type: 'brute', x: 17, y: 15, hp: 2 }
       ],
@@ -239,7 +239,6 @@
     if (h === 'eaten' || h === 'spectating') {
       base.players[0].dead = true;
       base.aliens[2] = { type: 'brute', x: 5, y: 3, hp: 2 };
-      base.aliens[0] = { type: 'seeker', x: 7, y: 5, locked: true, target: [15, 9] };
     }
     return base;
   }
