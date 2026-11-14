@@ -14,7 +14,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4
 | `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), Gin + gRPC, pgx + sqlc (no ORM), Goose, testify + mockery, worked example |
 | `docs/DATABASE.md` | **Schema source of truth**: every table, constraint, FK and index, Go type mapping, roles, migration plan |
 | `docs/GUI-PLAN.md` | Vue app structure, stores, canvas renderer, client event handling |
-| `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; live URL and weekly playtests from sprint 3; maps milestones and acceptance criteria to sprints |
+| `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; weekly playtests from sprint 2 (tunnel), first full game in sprint 4, live URL in sprint 5, solo mode in sprint 8; maps milestones and acceptance criteria to sprints |
 | `docs/CI-CD.md` | GitHub Actions pipelines, the v1 single-VM Docker Compose deployment, migration policy, branching model, public-repo safeguards, path to GKE + Helm |
 
 ## Git workflow (mandatory)
