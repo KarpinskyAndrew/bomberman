@@ -7,11 +7,11 @@
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Netcode: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
 | **Mockups** | [mockups/index.html](./mockups/index.html): static HTML layouts of every screen and state in §3–4 (open locally in a browser) |
 
-**Changes in 0.6:**
+**Changes in 0.6** (follows SPEC v0.11): a `web/src/analytics/` module for product analytics (§5.1, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)).
+
+**Changes in 0.5:**
 
 - Removed the alien **lock-on line** (the dashed "laser" from a hunting alien to its target) from the plan and from the mockups. Alien movement is undecided (SPEC §4.7.1), so no targeting is shown. The red danger halo under every alien stays.
-
-**Changes in 0.5** (follows SPEC v0.11): a `web/src/analytics/` module for product analytics (§5.1, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)).
 
 **Changes in 0.4** (follows SPEC v0.9):
 
