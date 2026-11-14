@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and Ranked (ELO) and Unrated modes. Work has started on the database layer (`server/internal/store`, `server/internal/account`); most of the design still lives only in the docs (`docs/`). The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and three modes: Ranked (1-vs-1, ELO), Unrated (2–4 players) and Solo (one player against the aliens). Work has started on the database layer (`server/internal/store`, `server/internal/account`); most of the design still lives only in the docs (`docs/`). The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
 
 | Doc | Covers |
 |---|---|
 | `docs/SPECIFICATION.md` | Game rules, accounts, ranking/ELO, API (Gin + gRPC), deployment summary, milestones (M1–M8) |
 | `docs/SERVER-AND-NETWORK.md` | Go monorepo layout, simulation package, arena actor, binary protocol, prediction/interpolation |
-| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker |
+| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker, product analytics (four layers, §12) |
 | `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), Gin + gRPC, pgx + sqlc (no ORM), Goose, testify + mockery, worked example |
 | `docs/DATABASE.md` | **Schema source of truth**: every table, constraint, FK and index, Go type mapping, roles, migration plan |
 | `docs/GUI-PLAN.md` | Vue app structure, stores, canvas renderer, client event handling |
-| `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; live URL and weekly playtests from sprint 3; maps milestones and acceptance criteria to sprints |
+| `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; weekly playtests from sprint 2 (tunnel), first full game in sprint 4, live URL in sprint 5, solo mode in sprint 8; maps milestones and acceptance criteria to sprints |
 | `docs/CI-CD.md` | GitHub Actions pipelines, the v1 single-VM Docker Compose deployment, migration policy, branching model, public-repo safeguards, path to GKE + Helm |
 
 ## Git workflow (mandatory)

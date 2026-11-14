@@ -161,4 +161,7 @@ type UserStat struct {
 	Deaths         int32
 	DeathsByAlien  int32
 	UpdatedAt      pgtype.Timestamptz
+	SoloRuns       int32
+	SoloWins       int32
+	SoloBestScore  int32
 }

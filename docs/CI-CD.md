@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 0.3 (draft) |
-| **Date** | 2026-11-11 |
+| **Version** | 0.4 (draft) |
+| **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) |
+
+**Changes in 0.4:** an `umami` container and the `/api/collect` route for product analytics (§6.1, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)).
 
 **Changes in 0.3:**
 
@@ -321,7 +323,7 @@ echo "$IMAGE_TAG" > deployed.tag                     # previous value is kept in
 
 | Service | Image | Exposed | Notes |
 |---|---|---|---|
-| `caddy` | `web` image (Caddy + the Vue bundle) | **:80, :443** | Automatic HTTPS (Let's Encrypt), HTTP/2 + HTTP/3. Serves the SPA (`index.html` `no-cache`, hashed assets cached for a year). Routes `/play` (WebSocket) → `gameserver`, `/api/auth/*`, `/healthz`, `/ping` → `api` (Gin), `/bomberman.*` gRPC-Web paths → `envoy`. |
+| `caddy` | `web` image (Caddy + the Vue bundle) | **:80, :443** | Automatic HTTPS (Let's Encrypt), HTTP/2 + HTTP/3. Serves the SPA (`index.html` `no-cache`, hashed assets cached for a year). Routes `/play` (WebSocket) → `gameserver`, `/api/auth/*`, `/api/collect`, `/healthz`, `/ping` → `api` (Gin), `/s.js`, `/api/s`, `/umami` → `umami`, `/bomberman.*` gRPC-Web paths → `envoy`. |
 | `envoy` | `envoyproxy/envoy` | internal | `envoy.filters.http.grpc_web` + CORS, forwards gRPC to `api:9090` |
 | `api` | `api` | internal | Gin on :8080 (auth, health), gRPC on :9090 |
 | `gameserver` | `gameserver` | internal | WebSocket on :8081. `stop_grace_period: 2m` (§6.2). |
@@ -330,7 +332,8 @@ echo "$IMAGE_TAG" > deployed.tag                     # previous value is kept in
 | `postgres` | `postgres:17` | internal | Data on the persistent disk (`/mnt/pgdata`). Login roles created by `deploy/postgres/init` on first start. |
 | `otel-collector` | `otel/opentelemetry-collector-contrib` | internal | OTLP in → traces to **Cloud Trace** |
 | `prometheus` | `prom/prometheus` | internal | Scrapes `/metrics` of api, gameserver, worker, envoy, caddy. 15-day retention. |
-| `grafana` | `grafana/grafana` | via Caddy at `/grafana`, behind Grafana login | Provisioned dashboards and alert rules (§7) |
+| `grafana` | `grafana/grafana` | via Caddy at `/grafana`, behind Grafana login | Provisioned dashboards and alert rules (§7), including the analytics "Funnel" dashboard |
+| `umami` | `ghcr.io/umami-software/umami` (pinned tag) | via Caddy: tracker at `/s.js`, collector at `/api/s`, dashboard at `/umami` behind Umami's login | Cookieless web analytics from sprint 5 ([Events §12.2](./EVENTS-AND-MESSAGING.md#122-layer-1-umami)). Uses its own `umami` database and login role in `postgres`, so `postgres` joins the stack in sprint 5. |
 
 - Every service except `caddy` is on an internal Docker network only. Postgres is never published to the host.
 - Container logs go to **Cloud Logging** through the Ops Agent on the VM. Services log JSON with `log/slog`, so fields such as `matchId` stay searchable.
