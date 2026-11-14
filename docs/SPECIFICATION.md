@@ -263,6 +263,8 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 | **Brute** | Red armored | 3 | 0.35 s [21 ticks] | Hunts like a Seeker within **5 tiles** but does not avoid danger. After each hit it is invulnerable for 1 s [60 ticks] and blinks. | **2** |
 
 - Every alien is **slower than a player** (player: 9 ticks per tile). Because contact is lethal, a player can always outrun an alien in an open corridor.
+- **The Behavior column is provisional.** How aliens move will be decided by playtests. Candidates range from pure random walking, over the pursuit described above, to aliens that play like a player (going for collectibles, cutting off escape routes). Look, HP, speed and drops are fixed; the movement logic is not.
+- Because of that, alien movement is built as **interchangeable behaviors** (a strategy per alien, [Server & Network §3.2](./SERVER-AND-NETWORK.md#32-the-simulation-package-internalgame)): each behavior only answers "which direction next?", and everything else (contact kill, damage, drops, spawning) is the same for all of them. A new behavior can be added, or assigned to an alien type, without touching the rest of the simulation.
 
 #### 4.7.2 Interaction rules
 
@@ -272,7 +274,7 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 
   HP and invulnerability do **not** protect against this.
 - **Telegraphing** (required, because contact is lethal):
-  - A hunting Seeker or Brute changes appearance when it locks on, e.g. its eye turns red (see GUI Plan).
+  - If a behavior hunts players, the alien changes appearance while it does, e.g. its eye turns red (see GUI Plan). There is no line or marker pointing from an alien to its target.
   - A spawn portal glows for 1.5 s before an alien appears, and portal tiles are harmless.
 - Aliens are blocked by hard walls, soft walls and bombs. They **cannot** place bombs or destroy walls.
 - Aliens do not block or harm each other, and they may overlap.
