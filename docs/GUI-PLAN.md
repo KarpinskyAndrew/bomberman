@@ -2,14 +2,16 @@
 
 | | |
 |---|---|
-| **Version** | 0.5 (draft) |
+| **Version** | 0.6 (draft) |
 | **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Netcode: [SERVER-AND-NETWORK.md](./SERVER-AND-NETWORK.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
 | **Mockups** | [mockups/index.html](./mockups/index.html): static HTML layouts of every screen and state in §3–4 (open locally in a browser) |
 
-**Changes in 0.5:**
+**Changes in 0.6:**
 
 - Removed the alien **lock-on line** (the dashed "laser" from a hunting alien to its target) from the plan and from the mockups. Alien movement is undecided (SPEC §4.7.1), so no targeting is shown. The red danger halo under every alien stays.
+
+**Changes in 0.5** (follows SPEC v0.11): a `web/src/analytics/` module for product analytics (§5.1, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)).
 
 **Changes in 0.4** (follows SPEC v0.9):
 
@@ -352,6 +354,11 @@ web/src/
       animations.ts tweening, frame timing
     audio.ts        SFX + music
     hudBridge.ts    throttled push of HUD values into Pinia
+  analytics/    track.ts: the only way components report analytics. A closed union of event names, an in-memory
+                session id (`sid`, sent in AUTH as `asid`), Umami page views and button events (sprint 5), batched
+                POST /api/collect + sendBeacon on hide (sprint 18), and a Global Privacy Control check that turns
+                everything off. Buttons opt in with a `data-track="<id>"` attribute and one delegated listener.
+                Never called from the game loop. See Events §12.
   stores/       auth.ts, session.ts, lobby.ts, arena.ts, hud.ts, settings.ts, connection.ts, rating.ts
   views/        LandingView, LobbyView, ArenaView, ProfileView, LeaderboardView, NotFoundView
   components/

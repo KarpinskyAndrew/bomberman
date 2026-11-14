@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Version** | 0.10 (draft) |
+| **Version** | 0.11 (draft) |
 | **Date** | 2026-11-14 |
 | **Stack** | Go (Gin, gRPC + buf, pgx, Goose), Vue 3 + TypeScript (Vite, Pinia, Tailwind, gRPC-Web), **PostgreSQL 17**, Envoy, Google Cloud (one Compute Engine VM in v1, Pub/Sub), GitHub Actions, OpenTelemetry + Prometheus + Sentry |
 
@@ -19,6 +19,7 @@ Related documents:
 
 | Version | Changes |
 |---|---|
+| 0.11 | **Product analytics** in four layers (§8, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)): cookieless Umami from the live URL, funnel counters in Prometheus, an own event pipeline into BigQuery, and consent-gated heatmaps only on demand. No consent banner for the first three; all data stays in the EU. |
 | 0.10 | New **Solo mode** (§4.9): one player against the aliens, for when few players are online. Single round, never rated, open to guests; survive the 3 minutes to win, and the score is the number of aliens killed. Difficulty sets the alien count (2 / 4 / 6). "PvE-only modes" leaves the non-goals; co-op stays out. Registered players' solo runs are stored ([DATABASE 0.4](./DATABASE.md)). New acceptance criterion 17. |
 | 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. **Arena size** is a setting: Small 15×15, Medium 17×17, Large 21×21, defaulting to the player count; Ranked is always Small (§4.1). |
 | 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
@@ -650,7 +651,7 @@ The full schema (every table, column, constraint, foreign key and index, plus th
 | Game server | One container, arenas in memory | Game pods per region + gateway (Server & Network §8.2) |
 | Rating worker | One container, Pub/Sub **pull** subscription | Deployment, same code |
 | Message queue | **Cloud Pub/Sub**: topic `match-events` + `match-events-dlq`. `user-events` is added in v1.1. | Same |
-| Analytics (optional) | Pub/Sub → **BigQuery subscription** on `match-events` | Same |
+| Analytics | Four layers ([Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)): **Umami** container (cookieless web analytics, own `umami` database), funnel counters in **Prometheus**, an own event pipeline (Pub/Sub `analytics-events` → **BigQuery**), consent-gated **PostHog EU** heatmaps on demand only. Optionally `match-events` → BigQuery too. | Same |
 | Database | **PostgreSQL 17** container, nightly `pg_dump` → Cloud Storage, disk snapshots | **Cloud SQL for PostgreSQL 17** (HA, PITR) |
 | Arena directory / lobby pub/sub | In-process | **Memorystore for Redis** |
 | Secrets | **Secret Manager**, fetched into a root-only `.env` at deploy time | Secret Manager via the CSI driver / Workload Identity |
@@ -674,6 +675,7 @@ The topology, why it was chosen for latency, and the scaling path are covered in
   - The BigQuery dataset location is `EU`.
   - Cloud Storage buckets (backups, replays) are `EU` / `europe-west3`, and disk snapshots use an EU storage location.
   - Sentry is configured with its **EU data region**.
+  - Analytics stays in the EU: Umami runs on the VM, the `analytics` BigQuery dataset is in `EU`, and PostHog (only when switched on, with consent) uses its **EU Cloud**. Privacy rules: [Events §12.5](./EVENTS-AND-MESSAGING.md#125-privacy-rules-all-layers).
   - The project has no organization in v1, so the `gcp.resourceLocations` org policy can't be set. Every resource is created with an explicit EU location by the runbook ([CI-CD §8](./CI-CD.md#8-bootstrap-steps-one-time)). The org policy is added if the project moves into an organization.
 - **Expected latency:** with Premium Tier, players across the EU typically see about **10–40 ms** RTT to Frankfurt. v2 regions mainly add capacity and resilience and shave the edges, such as the Iberian peninsula and the Baltics.
 

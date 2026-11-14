@@ -10,7 +10,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4
 |---|---|
 | `docs/SPECIFICATION.md` | Game rules, accounts, ranking/ELO, API (Gin + gRPC), deployment summary, milestones (M1–M8) |
 | `docs/SERVER-AND-NETWORK.md` | Go monorepo layout, simulation package, arena actor, binary protocol, prediction/interpolation |
-| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker |
+| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker, product analytics (four layers, §12) |
 | `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), Gin + gRPC, pgx + sqlc (no ORM), Goose, testify + mockery, worked example |
 | `docs/DATABASE.md` | **Schema source of truth**: every table, constraint, FK and index, Go type mapping, roles, migration plan |
 | `docs/GUI-PLAN.md` | Vue app structure, stores, canvas renderer, client event handling |

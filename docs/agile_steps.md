@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Version** | 0.3 (draft) |
+| **Version** | 0.4 (draft) |
 | **Date** | 2026-11-14 |
-| **Based on** | [SPECIFICATION.md](./SPECIFICATION.md) 0.10, milestones §12, acceptance criteria §11 |
+| **Based on** | [SPECIFICATION.md](./SPECIFICATION.md) 0.11, milestones §12, acceptance criteria §11 |
 
 This plan cuts v1 into one-week sprints. **Every sprint ends with something a player can see and try**, and from sprint 2 on **real people test it every week**. Bugs, misunderstandings and "this isn't fun" come out while they are still cheap to fix, not after everything has been built.
 
@@ -12,6 +12,7 @@ This plan cuts v1 into one-week sprints. **Every sprint ends with something a pl
 
 | Version | Changes |
 |---|---|
+| 0.4 | **Product analytics** (Events §12): Umami web analytics in sprint 5 (so Postgres arrives there, for Umami's own database), funnel counters and a Grafana "Funnel" dashboard in sprint 14 (replacing "funnel numbers in the logs"), an own event pipeline into BigQuery in sprint 18, and heatmaps only on demand (§8). |
 | 0.3 | Reordered for **a real game sooner**. Friends join through a **tunnel** from sprint 2, before any cloud setup. **Bombs (3) and a full round (4)** come before the live URL (5) and client prediction (6), so the first complete game is in week 4 instead of week 6. **Room links** (sprint 4) let several groups test at once. **Solo mode** (SPEC 0.10 §4.9) arrives with the first aliens in **sprint 8**, so one tester can play alone; phones move to sprint 9. A text-map test helper is added to sprint 1. |
 | 0.2 | Reordered for earliest end-user feedback: live URL in sprint 3, prediction in sprint 4, phones in sprint 8, closed beta in sprint 14. Added the weekly playtest, a "Learn" question per sprint, replay capture, tunable rules and a 20 % feedback budget. |
 | 0.1 | First draft. |
@@ -182,9 +183,10 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
     - A *Report a bug* button that opens a prefilled GitHub issue form (build, browser, room, round, tick).
     - **Sentry** (EU region) for browser and server errors, so crashes arrive without anyone reporting them.
     - Client RTT shown in a small debug overlay.
+  - **Analytics layer 1** (Events §12.2): `umami` container with its own database in a first `postgres` container, tracker and collector on first-party paths through Caddy, page views plus the first button events through `web/src/analytics/`, Global Privacy Control respected, and a **privacy page** in the footer. *Can slip to sprint 6 if the cloud setup takes the whole week; the feedback button and Sentry come first.*
   - **Replay capture:** the arena keeps the seed and inputs of its recent rounds, the bug-report form includes the round id, and a Go test helper replays a captured round tick by tick. A tester's "I died through a wall" becomes a reproducible test. *Moves to sprint 7 if the cloud setup takes the whole week.*
-- **Done when:** a merge to `main` deploys after approval, at least 3 testers played a round on the live URL, and a test error arrived in Sentry. This is AC 16.
-- **New skills:** GCP (projects, IAM, Artifact Registry, Compute Engine), Caddy, a release pipeline with approvals, Sentry.
+- **Done when:** a merge to `main` deploys after approval, at least 3 testers played a round on the live URL, and a test error arrived in Sentry. This is AC 16. The Umami dashboard shows the playtest's visits.
+- **New skills:** GCP (projects, IAM, Artifact Registry, Compute Engine), Caddy, a release pipeline with approvals, Sentry, self-hosting a third-party service.
 
 > **From here on, every sprint ends with a release and a playtest on the live URL.** Until v1.0 the live server is a test environment: the testers know things will break, and any data may be wiped before launch (see §7).
 
@@ -314,9 +316,9 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
   - Prometheus + Grafana on the VM with the game metrics (S&N §9.1: arenas, players, tick duration and jitter, RTT, send queue depth, reconnects), alerts, external uptime check (CI-CD §7).
   - Security pass before strangers arrive: CSP, HSTS, CORS, socket message rate limit (90/s), API rate limits (Spec §9).
   - Game server deploy procedure that drains running arenas (CI-CD §6.2), because testers will now be playing during deploys.
-  - Simple funnel numbers in the logs (landing → lobby → first round → second round, split by solo and multiplayer), to see where people drop out.
+  - **Analytics layer 2** (Events §12.3, S&N §9.1 "Product counters"): session, arena-join, waiting-room-leave, wait-time, match, solo-run and play-again counters, and a Grafana **"Funnel"** dashboard (sessions → arena joins → matches started → finished → play again, split by mode), to see where people drop out and how many give up waiting.
   - A short beta survey linked from the match-end screen.
-- **Done when:** the closed beta is open, dashboards and alerts work, and a deploy during a running match was tested.
+- **Done when:** the closed beta is open, dashboards and alerts work (the Funnel dashboard included, with a test that the counters don't allocate on the tick path), and a deploy during a running match was tested.
 - **New skills:** Prometheus, Grafana, alerting.
 
 ---
@@ -332,7 +334,7 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
   - Finish the account slice (BACKEND-ARCHITECTURE §4): store `CreateWithRating`, `account.Service.Register`, argon2id hasher, Gin handler, mockery mocks and testify tests.
   - Login with username or email, 15-minute access JWT kept in memory, 30-day refresh token (hashed, `HttpOnly` cookie, rotation and reuse detection), logout, rate limit of 5 failures per 15 min (Spec §3.3).
   - Vue register and login modals; registered names can't be used as guest nicknames.
-  - Production: Postgres container, `migrate` container in `deploy.sh`, the roles script with passwords from Secret Manager, nightly `pg_dump` to Cloud Storage plus one restore drill (CI-CD §6.3).
+  - Production: the `bomberman` database in the Postgres container (which runs since sprint 5 for Umami), `migrate` container in `deploy.sh`, the roles script with passwords from Secret Manager, nightly `pg_dump` to Cloud Storage plus one restore drill (CI-CD §6.3).
   - Integration tests (`-tags=integration`) with `server/test/compose.yaml`, including the roles script and the constraint tests (DATABASE §8).
 - **Done when:** AC 1 passes completely, the integration tests run in CI, and a backup was restored once.
 - **New skills:** the store/repository layer, mockery, cookie-based auth, Secret Manager.
@@ -375,8 +377,9 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
   - Profile and leaderboard pages from the mockups (GUI §4.7, §4.7a), rating chart, solo stats; the solo result screen shows the personal best.
   - Lobby shows the waiting opponent's rating; ranked Quick Play prefers ±200 rating.
   - Account deletion / GDPR erasure (DATABASE §6.2).
-- **Done when:** AC 13, 15 and 17 pass.
-- **New skills:** gRPC, buf, Envoy, gRPC-Web.
+  - **Analytics layer 3** (Events §12.4): `analytics.v1.AnalyticsEvent` schema in `protocol/events`, Gin `POST /api/collect` with validation and rate limit, client batching with `sendBeacon`, server-side events from the game server through a non-blocking channel, Pub/Sub topic `analytics-events` with a BigQuery subscription (dataset in `EU`, 90-day partitions), and the funnel queries in `deploy/analytics/*.sql`. No user ids in v1. *Moves to the buffer week after sprint 18 if the gRPC work takes the whole sprint.*
+- **Done when:** AC 13, 15 and 17 pass. A playtest session shows up in BigQuery as one funnel from `page_view` to `match_ended`, joined by its `sid`.
+- **New skills:** gRPC, buf, Envoy, gRPC-Web; BigQuery and Pub/Sub schemas.
 
 ---
 
@@ -505,9 +508,14 @@ Track the sprints as GitHub Milestones (`Sprint 01` …) with one issue per scop
 2. **Beta data at launch:** keep the beta testers' accounts and ratings at v1.0, or reset them? The spec has no seasons or resets *after* launch (§5.4.1); a one-time reset before launch would give everyone a fair start, but costs early testers their progress. Decide before sprint 15, and tell the testers when they register.
 3. **Tester recruitment:** who are the 3–8 alpha testers (sprint 2) and the 20–50 beta testers (sprint 14)?
 4. **Solo scoring and pressure** (Spec §13): is "survive 3 minutes" the right goal, should alien types score differently, is a 30 s respawn enough on Easy? The sprint 8 and 10 playtests answer this.
+5. **Privacy page review:** who checks the privacy page for GDPR before sprint 5 and before v1.0 (Events §12.5)?
 
 ---
 
 ## 8. After v1 (backlog, not planned)
 
 From Spec §12: v1.1 extras (Phantom alien, +Speed/Kick, lobby chat, email verification and password reset, anti-farming, ranked matchmaking queue, outbox relay, solo while waiting for an opponent, a solo leaderboard) and v2 scaling (GKE + Helm, Cloud SQL, multi-region game pods, Redis directory, WebTransport). Each becomes its own sprint once v1 is out, following the same "playtest every week" rule.
+
+**Analytics after v1:** `user_id` in analytics events together with the `user.deleted.v1` erasure consumer (v1.1, Events §12.4).
+
+**Analytics layer 4, on demand only** (Events §12.6): PostHog EU heatmaps and recordings behind an opt-in consent banner. It is not planned into any sprint. Pull it in, scoped to the screens in question and for a fixed period, only when a playtest raises a question that layers 1–3 can't answer, and try extra `click` events first.

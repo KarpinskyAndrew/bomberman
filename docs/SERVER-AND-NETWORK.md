@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 0.4 (draft) |
-| **Date** | 2026-11-11 |
+| **Version** | 0.5 (draft) |
+| **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
+
+**Changes in 0.5:** product counters for the analytics funnel (§9.1), and an optional analytics session id `asid` in the `auth` message (§5.3). See [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics).
 
 **Changes in 0.4:**
 
@@ -375,7 +377,7 @@ u8 nAliens
 
 | Direction | Types |
 |---|---|
-| C→S | `auth`, `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready` (`{ready: bool}`), `arena.kick`, `resync`. There is no `arena.start`: a match starts only through the all-ready countdown (SPEC §5.2). |
+| C→S | `auth` (optional `asid`: the client's in-memory analytics session id, copied into server-side analytics events, [Events §12.4](./EVENTS-AND-MESSAGING.md#124-layer-3-own-event-pipeline); never used for game logic), `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready` (`{ready: bool}`), `arena.kick`, `resync`. There is no `arena.start`: a match starts only through the all-ready countdown (SPEC §5.2). |
 | S→C | `auth.ok`, `lobby.list`, `lobby.update`, `arena.state`, **`arena.ready_countdown`** (`{endsAtTick\|null, paused: bool, reason?: "player_joined"\|"not_ready"\|"player_left"}`, sent whenever the 15 s waiting-room countdown starts, pauses, restarts or is cancelled), `arena.countdown` (`{roundNo, bestOf, score}`), **`round.end`** (`{roundNo, winnerSlot\|null, draw, reason: "last_standing"\|"timeout_hp"\|"simultaneous", survivorsHp, placements, points, score:[{slot, roundWins, roundPoints}], matchDecided}`), `match.end` (`{matchId, mode, bestOf, winnerSlot\|null, draw, placements, rounds, stats, ratingPending}`), **`rating.updated`** (`{matchId, before, after, delta, tier, rank?}`), `server.draining`, `error` (`{code, message}`, e.g. `ranked_requires_account` when a guest tries to join a Ranked arena) |
 
 ### 5.4 Bandwidth estimate (4 players, 8 aliens)
@@ -551,6 +553,19 @@ When a player chooses an arena, quick-plays or creates one, the API service or l
 | `client_resync_total`, `event_replay_total` | counter | spike |
 
 Messaging metrics (Pub/Sub latency, spool, DLQ, rating lag) are listed in [Events §10](./EVENTS-AND-MESSAGING.md#10-observability).
+
+**Product counters** (analytics layer 2, [Events §12.3](./EVENTS-AND-MESSAGING.md#123-layer-2-server-counters), sprint 14). They feed the Grafana "Funnel" dashboard and have no alerts. Labels are low-cardinality only: never a user, session, arena or match id.
+
+| Metric | Type | Labels |
+|---|---|---|
+| `sessions_started_total` | counter | `kind` (`guest` / `registered`), `input` (`keyboard` / `touch`) |
+| `arena_joins_total` | counter | `mode`, `via` (`list` / `code` / `quick_play` / `link` / `solo`) |
+| `waiting_room_leaves_total` | counter | `mode`, `reason` (`left` / `disconnected` / `kicked`) |
+| `waiting_room_wait_seconds` | histogram | `mode`, `outcome` (`started` / `left`) |
+| `matches_started_total`, `matches_finished_total` | counter | `mode` (+ `forfeit` on finished) |
+| `solo_runs_total` | counter | `difficulty`, `result` (`survived` / `eliminated`) |
+| `play_again_total` | counter | `mode` |
+| `analytics_dropped_total` | counter | `source` (events dropped by the layer 3 publisher, Events §12.4) |
 
 - Metrics are recorded with the **OpenTelemetry** metrics API and exposed on `/metrics` by the Prometheus exporter. Prometheus scrapes them, and Grafana holds the dashboards and the alert rules in the table above ([CI-CD §7](./CI-CD.md#7-rollback-notifications-observability)).
 - Hot-path instruments (tick duration, jitter) are created once at startup, with pre-built attribute sets, and are recorded outside `sim.Step`. A benchmark of the full arena tick checks that recording them doesn't allocate.
