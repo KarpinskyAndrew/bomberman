@@ -2,14 +2,16 @@
 
 | | |
 |---|---|
-| **Version** | 0.1 (draft) |
-| **Date** | 2026-11-14 |
+| **Version** | 0.2 (draft) |
+| **Date** | 2026-11-18 |
 | **Parent** | [GUI-PLAN.md](./GUI-PLAN.md) (screens, architecture) - Sprints: [agile_steps.md](./agile_steps.md) |
 | **Sources** | [mockups/](./mockups/index.html): `mockups.css` (retro), `mockups-modern.css` (modern), `theme.js`, `arena.js`, `touch.js`, `mock.js` and the eight screen files |
 
+**Changes in 0.2:** the tokens (4.2) and the first common components now exist in `web/` (4.5). Four components were renamed because Vue's lint rule `vue/multi-word-component-names` requires names of two or more words: `Avatar` → `PlayerAvatar`, `Badge` → `BaseBadge`, `Chip` → `BaseChip`, `Panel` → `BasePanel`.
+
 **Changes in 0.1:** first draft. Routes, design tokens for both mockup themes, the component inventory, a Tailwind v4 mapping proposal and the open design questions.
 
-This document is the bridge between the static HTML mockups in `docs/mockups/` and the Vue 3 + TypeScript + Tailwind app that will live in `web/`. It lists every screen and its route, extracts the design tokens from the mockup CSS and canvas code, names the reusable components, and proposes how the tokens become Tailwind classes. The mockups and GUI-PLAN stay the source of truth for what a screen shows; this doc says how it is built and styled. Everything about `web/` here is a proposal: nothing under `web/` exists yet.
+This document is the bridge between the static HTML mockups in `docs/mockups/` and the Vue 3 + TypeScript + Tailwind app that will live in `web/`. It lists every screen and its route, extracts the design tokens from the mockup CSS and canvas code, names the reusable components, and proposes how the tokens become Tailwind classes. The mockups and GUI-PLAN stay the source of truth for what a screen shows; this doc says how it is built and styled. Section 4.5 says which parts of `web/` exist; everything else about `web/` here is a proposal.
 
 **A few terms used below:**
 
@@ -422,18 +424,18 @@ Names follow GUI-PLAN 5.1 where it already names the component; new names are ma
 | `KeyCap` | `label`, `rebinding` (blinking orange) | Landing hints, waiting room controls, ESC menu, settings | field, edge-strong, radius-kbd, font-ui | **1** |
 | `SegmentedControl` *(new)* | `options`, `modelValue`, `disabled` per option | Sprint 1 size picker, create arena (mode, players, size), settings, profile filter | field, edge, surface-3, radius-control / pill | **1** |
 | `BaseModal` | `title`, `size`: `sm` (380-420px), `md` (460px), `wide` (680px); slots: default, `footer`; `closable` | All dialogs | glass-strong / surface, edge-strong, scrim, blur-scrim, radius-modal, shadow-modal, z-modal, duration-modal | 8 |
-| `Panel` *(new)* | `title`, slots: `head-extra`, default; `padded` | Lobby, waiting room, profile, leaderboard | surface / glass, edge, radius-panel, shadow-lift, blur-glass | 11 |
+| `BasePanel` *(new)* | `title`, slots: `head-extra`, default; `padded` | Lobby, waiting room, profile, leaderboard | surface / glass, edge, radius-panel, shadow-lift, blur-glass | 11 |
 | `BaseInput` *(new)* | `invalid`, `hint`, `hintTone` (`ok`, `err`), leading icon | Auth forms, create arena, lobby search | field, edge-strong, fire-2 focus, bad, radius-control, shadow-focus(-error) | 11 |
 | `BaseSelect` *(new)* | same as `BaseInput` | Lobby filters, create arena region, settings region | same | 11 |
 | `BaseCheckbox` *(new)* | label | Lobby "Hide full", "Keep me logged in" | fire-2 (`accent-color`) | 11 |
 | `ToggleSwitch` *(new)* | `modelValue`, label, sub-label | Create arena "Private", settings | track, fire-2 / gradient-fire, radius-pill | 13 |
 | `BaseSlider` | `min`, `max`, `unit`, `prefix`, `locked` | Create arena rules, audio volumes | fire-2 | 11 |
-| `Badge` *(new)* | `tone`: `ranked`, `unrated`, `guest`, `host`, `live`, `private`; icon | Lobby rows, waiting room, results, profile history | fire-1, fire-2, muted, dim, ok, radius-badge, text-2xs, tracking-label | 11 |
-| `Chip` *(new)* | `hot` (ranked) | Waiting room rules, results head, landing hints (modern) | edge, muted, fire-1, radius-pill | 12 |
+| `BaseBadge` *(new)* | `tone`: `ranked`, `unrated`, `guest`, `host`, `live`, `private`; icon | Lobby rows, waiting room, results, profile history | fire-1, fire-2, muted, dim, ok, radius-badge, text-2xs, tracking-label | 11 |
+| `BaseChip` *(new)* | `hot` (ranked) | Waiting room rules, results head, landing hints (modern) | edge, muted, fire-1, radius-pill | 12 |
 | `AlertBox` *(new)* | `tone`: `info`, `warn`, `err` | Auth modals, join error, ESC menu | info, warn, bad, radius-control | 11 |
 | `DividerLabel` *(new)* | text | Create arena, settings | dim, edge, tracking-label | 11 |
 | `TabList` *(new)* | `tabs`, `modelValue` | Settings | muted, ink, fire-2 underline | 19 |
-| `Avatar` *(new)* | `letter`, `playerIndex` (sets `--pc`), `size`: `sm`, `md`, `lg`, `xl`; `guest`; `empty` | Top bar user chip, slots, me bar, profile | p1-p4, on-player, track, radius-avatar, size-avatar | 11 |
+| `PlayerAvatar` *(new)* | `letter`, `playerIndex` (sets `--pc`), `size`: `sm`, `md`, `lg`, `xl`; `guest`; `empty` | Top bar user chip, slots, me bar, profile | p1-p4, on-player, track, radius-avatar, size-avatar | 11 |
 | `PlayerSwatch` *(new)* | `playerIndex` | HUD cards, results table | p1-p4 (modern: round + glow) | 4 |
 | `HeartsMeter` *(new)* | `hp`, `max` (5) | HUD cards, touch bar | bad, track | 4 |
 | `RoundPips` *(new)* | `wins`, `needed` (2), `playerIndex` | HUD ranked, round end, touch bar | p1-p4 | 16 |
@@ -510,7 +512,7 @@ Names follow GUI-PLAN 5.1 where it already names the component; new names are ma
 | Component | Props / variants | Used on | Tokens | Sprint |
 |---|---|---|---|---|
 | `TierBadge` | `tier`, optional rating | Top bar, lobby, slots, profile, leaderboard | tier colors (diamond marker with glow) | 11 (rating shown from 17) |
-| `RankedBadge` | - | Lobby, results, profile | `Badge ranked` | 16 |
+| `RankedBadge` | - | Lobby, results, profile | `BaseBadge ranked` | 16 |
 | `RatingDelta` | `delta`, `pending` | Results, profile history | ok, bad, shimmer, duration-pop | 17 |
 | `TierUpBadge` *(new)* | up / down | Results | gradient gold, radius-badge | 17 |
 | `ProfileHeader` *(new)* + `StatsSummary` | rated / placement | Profile | avatar xl, font-display, stat grid | 18 |
@@ -686,21 +688,22 @@ web/
     styles/                   (new folder)
       main.css                @import "./tokens.css"; base and reduced-motion rules
       tokens.css              @theme tokens + [data-theme="modern"] overrides (4.2)
-    assets/fonts/             self-hosted Inter (+ Bungee) woff2
+                              (fonts: self-hosted through the @fontsource/inter and @fontsource/bungee
+                               packages, imported in main.css, instead of woff2 files in assets/fonts/)
     stores/settings.ts        + theme, reducedMotion
     game/renderer/
       palette.ts              (new file) canvas palettes (4.4)
     components/
       common/                 BaseButton, BaseModal, BaseSlider, Toast, Spinner, KeyCap, PingBadge (GUI-PLAN)
-                              + AppIcon, IconButton, BrandLogo, SegmentedControl, Panel, BaseInput, BaseSelect,
-                                BaseCheckbox, ToggleSwitch, Badge, Chip, AlertBox, DividerLabel, TabList, Avatar,
+                              + AppIcon, IconButton, BrandLogo, SegmentedControl, BasePanel, BaseInput, BaseSelect,
+                                BaseCheckbox, ToggleSwitch, BaseBadge, BaseChip, AlertBox, DividerLabel, TabList, PlayerAvatar,
                                 PlayerSwatch, HeartsMeter, RoundPips, SlotDots, ProgressRing, DrainBar, Shimmer,
                                 AppTopBar, UserChip, AppFooter, ThemeToggle, Pager, ArenaBackdrop (new)
       auth/ lobby/ arena/ profile/ ranking/ settings/   as in GUI-PLAN 5.1, plus the (new) names in section 3
     views/                    + PrivacyView (new)
 ```
 
-Nothing here is created yet. The `web/` scaffold is a sprint 1 task, built test-first.
+**Exists (sprint 1):** the `create-vue` scaffold (Vue 3, TS strict, Vite, Router, Pinia, Vitest, ESLint + oxlint, Prettier), Tailwind v4 through `@tailwindcss/vite`, `styles/tokens.css` and `styles/main.css` with both themes, `views/LandingView` on `/`, and these common components, each with a Vitest spec: `AppIcon`, `BaseButton`, `IconButton`, `BrandLogo`, `KeyCap`, `SegmentedControl`, `BaseBadge`, `BaseChip`, `AlertBox`, `DividerLabel`, `BasePanel`, `BaseModal`, `PlayerAvatar`, `HeartsMeter`, `SlotDots`, `PingBadge`, plus `icons.ts` (icon set) and `variants.ts` (button class map). The router lives in `router/index.ts` (GUI-PLAN 5.1 says `router.ts`; same import path). Shadows, sizes, z-index, blur and gradients live in `:root`, not `@theme`, and are used as `shadow-(--shadow-modal)`, `h-(--size-control)` and so on, so the modern theme can override them at runtime. Not yet: the inline theme boot script in `index.html` (4.3), the `settings` store fields and `palette.ts`.
 
 ---
 
