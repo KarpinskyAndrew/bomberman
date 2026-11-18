@@ -82,11 +82,15 @@ describe('BaseModal', () => {
     await nextTick()
     const last = document.getElementById('last')!
     last.focus()
-    last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))
+    last.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+    )
     expect(document.activeElement?.id).toBe('first')
 
     const first = document.getElementById('first')!
-    first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))
+    first.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+    )
     expect(document.activeElement?.id).toBe('last')
   })
 

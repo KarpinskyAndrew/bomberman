@@ -12,7 +12,9 @@ describe('PingBadge', () => {
   })
 
   it('hides the region visually when compact', () => {
-    const region = mount(PingBadge, { props: { ms: 24, region: 'EU', compact: true } }).find('[data-region]')
+    const region = mount(PingBadge, { props: { ms: 24, region: 'EU', compact: true } }).find(
+      '[data-region]',
+    )
     expect(region.classes()).toContain('sr-only')
   })
 

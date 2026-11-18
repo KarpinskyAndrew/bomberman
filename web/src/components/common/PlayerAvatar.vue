@@ -42,5 +42,6 @@ const tone = computed(() => {
     class="grid flex-none select-none place-items-center rounded-avatar font-extrabold"
     :class="[SIZES[size], tone]"
     :style="style"
-  >{{ letter }}</span>
+    >{{ letter }}</span
+  >
 </template>

@@ -17,6 +17,10 @@ describe('BaseChip', () => {
   })
 
   it('renders an optional icon', () => {
-    expect(mount(BaseChip, { props: { icon: 'alien' } }).find('svg').exists()).toBe(true)
+    expect(
+      mount(BaseChip, { props: { icon: 'alien' } })
+        .find('svg')
+        .exists(),
+    ).toBe(true)
   })
 })

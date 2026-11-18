@@ -12,10 +12,12 @@ describe('IconButton', () => {
   })
 
   it('uses the icon-button size tokens', () => {
-    expect(mount(IconButton, { props: { icon: 'x', label: 'Close' } }).classes()).toContain('size-(--size-icon-btn)')
-    expect(mount(IconButton, { props: { icon: 'x', label: 'Close', size: 'sm' } }).classes()).toContain(
-      'size-(--size-icon-btn-sm)',
+    expect(mount(IconButton, { props: { icon: 'x', label: 'Close' } }).classes()).toContain(
+      'size-(--size-icon-btn)',
     )
+    expect(
+      mount(IconButton, { props: { icon: 'x', label: 'Close', size: 'sm' } }).classes(),
+    ).toContain('size-(--size-icon-btn-sm)')
   })
 
   it('emits click', async () => {

@@ -16,8 +16,7 @@ const titleId = `panel-${useId()}`
 <template>
   <section
     :aria-labelledby="title ? titleId : undefined"
-    class="rounded-panel border border-edge bg-glass bg-(image:--gradient-glass-hi) shadow-(--shadow-panel)
-      [backdrop-filter:var(--blur-glass)]"
+    class="rounded-panel border border-edge bg-glass bg-(image:--gradient-glass-hi) shadow-(--shadow-panel) [backdrop-filter:var(--blur-glass)]"
   >
     <header
       v-if="title"

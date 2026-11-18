@@ -97,8 +97,7 @@ onBeforeUnmount(() => {
     <div
       v-if="open"
       data-modal-backdrop
-      class="fixed inset-0 z-(--z-modal) grid animate-fade-in place-items-center bg-scrim p-4
-        [backdrop-filter:var(--blur-scrim)]"
+      class="fixed inset-0 z-(--z-modal) grid animate-fade-in place-items-center bg-scrim p-4 [backdrop-filter:var(--blur-scrim)]"
       @click.self="close"
     >
       <div
@@ -107,12 +106,14 @@ onBeforeUnmount(() => {
         aria-modal="true"
         :aria-labelledby="titleId"
         tabindex="-1"
-        class="max-h-[calc(100vh-32px)] animate-pop-in overflow-auto rounded-modal border border-edge-strong
-          bg-surface shadow-(--shadow-modal) modern:bg-glass-strong modern:[backdrop-filter:var(--blur-glass)]"
+        class="max-h-[calc(100vh-32px)] animate-pop-in overflow-auto rounded-modal border border-edge-strong bg-surface shadow-(--shadow-modal) modern:bg-glass-strong modern:[backdrop-filter:var(--blur-glass)]"
         :class="SIZES[size]"
         @keydown="onKeydown"
       >
-        <header data-modal-head class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4.5">
+        <header
+          data-modal-head
+          class="flex items-center justify-between gap-3 border-b border-edge px-5 py-4.5"
+        >
           <h2
             :id="titleId"
             class="font-display text-xl font-(--font-weight-display) tracking-display"

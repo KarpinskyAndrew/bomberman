@@ -12,8 +12,10 @@ describe('BrandLogo', () => {
 
   it('hides the name visually below md when compact, keeping it for screen readers', () => {
     expect(mount(BrandLogo).find('[data-brand-name]').classes()).not.toContain('max-md:sr-only')
-    expect(mount(BrandLogo, { props: { compact: true } }).find('[data-brand-name]').classes()).toContain(
-      'max-md:sr-only',
-    )
+    expect(
+      mount(BrandLogo, { props: { compact: true } })
+        .find('[data-brand-name]')
+        .classes(),
+    ).toContain('max-md:sr-only')
   })
 })

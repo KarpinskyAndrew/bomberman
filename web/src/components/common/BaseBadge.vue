@@ -24,8 +24,7 @@ const TONES: Record<BadgeTone, string> = {
 
 <template>
   <span
-    class="inline-flex h-5.5 items-center gap-1.25 whitespace-nowrap rounded-badge border px-2 text-2xs font-bold
-      uppercase tracking-label"
+    class="inline-flex h-5.5 items-center gap-1.25 whitespace-nowrap rounded-badge border px-2 text-2xs font-bold uppercase tracking-label"
     :class="TONES[tone]"
   >
     <AppIcon v-if="icon" :name="icon" :size="12" />

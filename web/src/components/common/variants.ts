@@ -26,7 +26,9 @@ const BUTTON_SIZES: Record<ButtonSize, string> = {
 }
 
 export function buttonClasses(variant: ButtonVariant, size: ButtonSize, block: boolean): string {
-  return [BUTTON_BASE, BUTTON_VARIANTS[variant], BUTTON_SIZES[size], block ? 'w-full' : ''].join(' ').trim()
+  return [BUTTON_BASE, BUTTON_VARIANTS[variant], BUTTON_SIZES[size], block ? 'w-full' : '']
+    .join(' ')
+    .trim()
 }
 
 export type PingTone = 'ok' | 'warn' | 'bad'

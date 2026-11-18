@@ -13,7 +13,9 @@ describe('BaseButton', () => {
   })
 
   it('applies variant, size and block classes', () => {
-    const b = mount(BaseButton, { props: { variant: 'primary', size: 'lg', block: true } }).find('button')
+    const b = mount(BaseButton, { props: { variant: 'primary', size: 'lg', block: true } }).find(
+      'button',
+    )
     expect(b.classes()).toContain('text-on-accent')
     expect(b.classes()).toContain('h-(--size-control-lg)')
     expect(b.classes()).toContain('w-full')

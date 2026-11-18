@@ -7,7 +7,11 @@ defineProps<{
 </script>
 
 <template>
-  <span role="img" :aria-label="`${filled} of ${max} players`" class="inline-flex gap-0.75 align-middle">
+  <span
+    role="img"
+    :aria-label="`${filled} of ${max} players`"
+    class="inline-flex gap-0.75 align-middle"
+  >
     <i
       v-for="n in max"
       :key="n"

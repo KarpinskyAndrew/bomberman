@@ -31,7 +31,15 @@ describe('AppIcon', () => {
   })
 
   it('sizes to the text by default and accepts an explicit size', () => {
-    expect(mount(AppIcon, { props: { name: 'x' } }).find('svg').attributes('width')).toBe('1em')
-    expect(mount(AppIcon, { props: { name: 'x', size: 18 } }).find('svg').attributes('width')).toBe('18')
+    expect(
+      mount(AppIcon, { props: { name: 'x' } })
+        .find('svg')
+        .attributes('width'),
+    ).toBe('1em')
+    expect(
+      mount(AppIcon, { props: { name: 'x', size: 18 } })
+        .find('svg')
+        .attributes('width'),
+    ).toBe('18')
   })
 })

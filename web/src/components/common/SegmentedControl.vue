@@ -28,10 +28,7 @@ const name = `seg-${useId()}`
     <label
       v-for="opt in options"
       :key="opt.value"
-      class="relative rounded-[7px] px-3.5 py-1.5 text-sm font-semibold text-muted modern:rounded-pill
-        has-checked:bg-surface-3 has-checked:text-ink has-checked:shadow-[inset_0_0_0_1px_var(--color-edge-strong)]
-        has-disabled:cursor-not-allowed has-disabled:opacity-35 has-focus-visible:outline-2
-        has-focus-visible:outline-offset-2 has-focus-visible:outline-fire-1"
+      class="relative rounded-[7px] px-3.5 py-1.5 text-sm font-semibold text-muted modern:rounded-pill has-checked:bg-surface-3 has-checked:text-ink has-checked:shadow-[inset_0_0_0_1px_var(--color-edge-strong)] has-disabled:cursor-not-allowed has-disabled:opacity-35 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-fire-1"
       :class="opt.disabled ? '' : 'cursor-pointer hover:text-ink'"
     >
       <input

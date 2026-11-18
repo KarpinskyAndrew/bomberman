@@ -51,7 +51,11 @@ describe('SegmentedControl', () => {
 
   it('works with numeric values', async () => {
     const w = mount(SegmentedControl, {
-      props: { options: [2, 3, 4].map((n) => ({ value: n, label: String(n) })), modelValue: 2, label: 'Max players' },
+      props: {
+        options: [2, 3, 4].map((n) => ({ value: n, label: String(n) })),
+        modelValue: 2,
+        label: 'Max players',
+      },
     })
     await w.findAll('input')[2]!.setValue(true)
     expect(w.emitted('update:modelValue')).toEqual([[4]])

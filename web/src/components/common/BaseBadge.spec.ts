@@ -22,7 +22,15 @@ describe('BaseBadge', () => {
   })
 
   it('renders an optional icon', () => {
-    expect(mount(BaseBadge, { props: { tone: 'private' } }).find('svg').exists()).toBe(false)
-    expect(mount(BaseBadge, { props: { tone: 'private', icon: 'lock' } }).find('svg').exists()).toBe(true)
+    expect(
+      mount(BaseBadge, { props: { tone: 'private' } })
+        .find('svg')
+        .exists(),
+    ).toBe(false)
+    expect(
+      mount(BaseBadge, { props: { tone: 'private', icon: 'lock' } })
+        .find('svg')
+        .exists(),
+    ).toBe(true)
   })
 })

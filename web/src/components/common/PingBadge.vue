@@ -22,10 +22,14 @@ const DOT: Record<PingTone, string> = {
 </script>
 
 <template>
-  <span :data-tone="tone" class="inline-flex items-center gap-1.75 whitespace-nowrap text-sm text-muted">
+  <span
+    :data-tone="tone"
+    class="inline-flex items-center gap-1.75 whitespace-nowrap text-sm text-muted"
+  >
     <span data-dot aria-hidden="true" class="size-2 rounded-full" :class="DOT[tone]" />
-    <span><span v-if="region" data-region :class="{ 'sr-only': compact }">{{ `${region} ` }}</span><span
-      class="tabular-nums"
-    >{{ Math.round(ms) }} ms</span></span>
+    <span
+      ><span v-if="region" data-region :class="{ 'sr-only': compact }">{{ `${region} ` }}</span
+      ><span class="tabular-nums">{{ Math.round(ms) }} ms</span></span
+    >
   </span>
 </template>
