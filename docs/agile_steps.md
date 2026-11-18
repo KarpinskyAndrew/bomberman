@@ -120,6 +120,7 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
   - **Text-map test helper:** `ParseGrid` reads a map drawn with `#`, `+` and `.` (the spec's legend), and `Grid.String()` prints one. Every later rule test (movement, blasts, aliens) is written as "this map, these inputs, expect that", and `cmd/vectorgen` reuses the same maps.
   - `cmd/gameserver`: minimal WebSocket endpoint (`coder/websocket`) that sends the map as a JSON control message.
   - `web/`: Vite + Vue 3 + TS strict + Tailwind + Router scaffold with Vitest, Landing page from the mockup, `GameClient` (plain TS, `markRaw`) with a canvas renderer ported from `docs/mockups/arena.js` (GUI G1/G2).
+  - `vue-i18n` set up from the start, English only (GUI §11): every UI string is a key in `i18n/en.json`, so later languages need no retrofit.
   - `ci.yml`, first version: `go test`, `golangci-lint`, `npm run lint / typecheck / test / build` on pull requests.
 - **Done when:** AC 3 (map invariants) passes as unit tests, and the canvas shows the map the server generated.
 - **New skills:** Go packages and tests for pure logic; Vite/Vue project setup; WebSocket in Go.
@@ -403,7 +404,7 @@ The rest of the account slice (store, service, Gin handler) is planned for **spr
 - **Demo:** walk through all 17 acceptance criteria (Spec §11) on the live URL, switch the language and the colorblind palette, then announce the launch.
 - **Scope:**
   - Accessibility: colorblind-safe player colors with name labels (GUI §11).
-  - i18n with vue-i18n (English + one more language).
+  - Translations: German, Hungarian and Spanish next to English (the vue-i18n setup exists since sprint 1), each reviewed by a native speaker; check every screen in German for overflowing labels.
   - Performance: bundle ≤ 300 KB gzipped, 60 FPS (Spec §10).
   - Load test with `cmd/bots`: ≥ 200 arenas on 2 vCPU (Spec §5.3).
   - OpenTelemetry traces (Spec §10); full Playwright E2E suite (GUI §12); bug bash; release notes.
