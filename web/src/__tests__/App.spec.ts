@@ -6,11 +6,18 @@ import router from '../router'
 
 describe('App', () => {
   it('shows the landing page at /', async () => {
-    router.push('/')
-    await router.isReady()
+    await router.push('/')
     const wrapper = mount(App, {
       global: { plugins: [router] },
     })
     expect(wrapper.get('h1').text()).toBe('BomberMan Online')
+  })
+
+  it('shows the arena at page /arena/local', async () => {
+    await router.push('/arena/local')
+
+    const wrapper = mount(App, { global: { plugins: [router] } })
+
+    expect(wrapper.get('h1').text()).toBe('Arena')
   })
 })
