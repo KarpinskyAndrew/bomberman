@@ -50,8 +50,7 @@ function onClick(event: MouseEvent) {
   <component
     :is="to !== undefined ? RouterLink : 'a'"
     v-if="isLink"
-    :to="to"
-    :href="to === undefined ? href : undefined"
+    v-bind="to != undefined ? { to } : { href }"
     :class="classes"
     :aria-disabled="disabled ? 'true' : undefined"
     :tabindex="disabled ? -1 : undefined"

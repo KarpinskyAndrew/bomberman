@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
+import router from '@/router'
+
 import BaseButton from './BaseButton.vue'
 
 const global = { stubs: { RouterLink: RouterLinkStub } }
@@ -55,5 +57,13 @@ describe('BaseButton', () => {
   it('renders a RouterLink when given to', () => {
     const w = mount(BaseButton, { props: { to: '/lobby' }, global })
     expect(w.findComponent(RouterLinkStub).props('to')).toBe('/lobby')
+  })
+
+  it('renders the real href when given to', () => {
+    const w = mount(BaseButton, {
+      props: { to: '/arena/local' },
+      global: { plugins: [router] },
+    })
+    expect(w.get('a').attributes('href')).toBe('/arena/local')
   })
 })
