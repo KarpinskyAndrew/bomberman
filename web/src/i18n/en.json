@@ -1,0 +1,13 @@
+{
+  "landing": {
+    "title": "BomberMan Online",
+    "tagline": "Real-time arena battles with aliens on the loose.",
+    "mapSize": "Map size",
+    "sizes": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "play": "Play"
+  }
+}

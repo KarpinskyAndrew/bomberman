@@ -1,0 +1,13 @@
+{
+  "landing": {
+    "title": "BomberMan Online",
+    "tagline": "Valós idejű arénacsaták elszabadult űrlényekkel.",
+    "mapSize": "Pályaméret",
+    "sizes": {
+      "small": "Kicsi",
+      "medium": "Közepes",
+      "large": "Nagy"
+    },
+    "play": "Játék"
+  }
+}
