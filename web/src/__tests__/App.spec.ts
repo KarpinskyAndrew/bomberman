@@ -13,7 +13,7 @@ describe('App', () => {
     expect(wrapper.get('h1').text()).toBe('BomberMan Online')
   })
 
-  it('shows the arena at page /arena/local', async () => {
+  it('shows the arena page at /arena/local', async () => {
     await router.push('/arena/local')
 
     const wrapper = mount(App, { global: { plugins: [router] } })
