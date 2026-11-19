@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import LandingView from '../LandingView.vue'
 import router from '@/router'
+import i18n from '@/i18n'
 
 function mountLanding() {
   return mount(LandingView, { global: { plugins: [router] } })
@@ -46,5 +47,21 @@ describe('LandingView', () => {
 
     await wrapper.get('input[value="21"]').setValue(true)
     expect(wrapper.get('a').attributes('href')).toBe('/arena/local?size=21')
+  })
+
+  describe('in Hungarian', () => {
+    afterEach(() => {
+      i18n.global.locale.value = 'en'
+    })
+
+    it('shows the Hungarian texts', () => {
+      i18n.global.locale.value = 'hu'
+      const wrapper = mountLanding()
+
+      expect(wrapper.get('p').text()).toBe('Valós idejű arénacsaták elszabadult űrlényekkel.')
+      expect(wrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Pályaméret')
+      expect(wrapper.get('label:last-child').text()).toBe('Nagy')
+      expect(wrapper.get('a').text()).toBe('Játék')
+    })
   })
 })

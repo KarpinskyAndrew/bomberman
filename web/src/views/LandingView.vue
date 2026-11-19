@@ -2,12 +2,16 @@
 import { computed, ref } from 'vue'
 import SegmentedControl from '@/components/common/SegmentedControl.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import { useI18n } from 'vue-i18n'
 
-const sizeOptions = [
-  { value: 15, label: 'Small' },
-  { value: 17, label: 'Medium' },
-  { value: 21, label: 'Large' },
-]
+const { t } = useI18n()
+
+const sizeOptions = computed(() => [
+  { value: 15, label: t('landing.sizes.small') },
+  { value: 17, label: t('landing.sizes.medium') },
+  { value: 21, label: t('landing.sizes.large') },
+])
+
 const size = ref(17)
 
 const playTarget = computed(() => ({
@@ -18,9 +22,9 @@ const playTarget = computed(() => ({
 </script>
 
 <template>
-  <h1>BomberMan Online</h1>
-  <p>Real-time arena battles with aliens on the loose.</p>
+  <h1>{{ t('landing.title') }}</h1>
+  <p>{{ t('landing.tagline') }}</p>
 
-  <SegmentedControl v-model="size" :options="sizeOptions" label="Map size" />
-  <BaseButton variant="primary" size="lg" :to="playTarget">Play</BaseButton>
+  <SegmentedControl v-model="size" :options="sizeOptions" :label="t('landing.mapSize')" />
+  <BaseButton variant="primary" size="lg" :to="playTarget">{{ t('landing.play') }}</BaseButton>
 </template>
