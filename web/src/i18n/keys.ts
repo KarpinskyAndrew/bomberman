@@ -11,3 +11,10 @@ export function flattenKeys(obj: Record<string, unknown>, prefix = ''): string[]
   }
   return keys
 }
+
+/** Reports whether two dictionaries have exactly the same dotted keys (values are ignored). */
+export function sameKeys(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+  const keysA = flattenKeys(a).sort()
+  const keysB = flattenKeys(b).sort()
+  return keysA.length === keysB.length && keysA.every((key, i) => key === keysB[i])
+}
