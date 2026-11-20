@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseGrid } from '../../grid'
 import { PAL } from '../palette'
-import { TILE, drawFloor, drawHard, drawSoft, type Pen } from '../tiles'
+import { TILE, drawFloor, drawGrid, drawHard, drawSoft, type Pen } from '../tiles'
 import { FakePen, type Rect } from './fakePen'
 
 /** Paints one tile with draw at (x, y) and returns the recorded rects. */
@@ -196,5 +196,25 @@ describe('drawSoft', () => {
 
   it('draws the same picture on every tile, only moved', () => {
     expect(paint(drawSoft, 2, 3)).toEqual(moved(paint(drawSoft, 0, 0), 32, 48))
+  })
+})
+
+describe('drawGrid', () => {
+  it('paints every tile with the painter for its kind, row by row', () => {
+    const grid = parseGrid(`
+        #+
+        ..
+        `)
+    const pen = new FakePen()
+
+    drawGrid(pen, grid)
+
+    const expected = new FakePen()
+    drawHard(expected, 0, 0)
+    drawSoft(expected, 1, 0)
+    drawFloor(expected, grid, 0, 1)
+    drawFloor(expected, grid, 1, 1)
+
+    expect(pen.rects).toEqual(expected.rects)
   })
 })

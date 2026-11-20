@@ -86,3 +86,22 @@ export function drawHard(pen: Pen, x: number, y: number): void {
 export function drawSoft(pen: Pen, x: number, y: number): void {
   paintParts(pen, SOFT_PARTS, x, y)
 }
+
+/** Paints every tile of the grid, row by row. */
+export function drawGrid(pen: Pen, grid: Grid): void {
+  grid.tiles.forEach((tile, index) => {
+    const x = index % grid.size
+    const y = Math.floor(index / grid.size)
+    switch (tile) {
+      case Tile.HardWall:
+        drawHard(pen, x, y)
+        break
+      case Tile.SoftWall:
+        drawSoft(pen, x, y)
+        break
+      case Tile.Empty:
+        drawFloor(pen, grid, x, y)
+        break
+    }
+  })
+}
