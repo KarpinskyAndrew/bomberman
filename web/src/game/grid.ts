@@ -41,7 +41,7 @@ function parseTile(c: string): Tile {
   }
 }
 
- /** Builds a Grid from a text map: '#' hard wall, '+' soft wall, '.' empty. Throws on a bad map. */
+/** Builds a Grid from a text map: '#' hard wall, '+' soft wall, '.' empty. Throws on a bad map. */
 export function parseGrid(text: string): Grid {
   const trimmedText = text.trim()
   if (trimmedText === '') {
