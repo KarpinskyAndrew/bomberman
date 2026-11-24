@@ -2,11 +2,11 @@ import type { Grid } from './grid'
 import { drawGrid, TILE, type Pen } from './renderer/tiles'
 
 /** The game engine: draws the arena on a canvas. Plain TypeScript, no Vue. */
-export class GameClient {  
+export class GameClient {
   private readonly grid: Grid
   private readonly pen: Pen
 
-  constructor(canvas: HTMLCanvasElement, grid: Grid) {    
+  constructor(canvas: HTMLCanvasElement, grid: Grid) {
     this.grid = grid
 
     canvas.width = grid.size * TILE
