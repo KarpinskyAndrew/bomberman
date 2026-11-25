@@ -1,0 +1,81 @@
+# Pull request checks (docs/CI-CD.md §4.1). Sprint 1 version: Go tests, golangci-lint
+# and the web checks. Integration tests, fuzzing, contract and docker-build jobs join
+# as the code they check arrives.
+name: ci
+
+on:
+  pull_request:
+    branches: [dev, main]
+  # Keeps the dev branch status honest after each squash merge.
+  push:
+    branches: [dev]
+
+# Fork PRs run with a read-only token and no secrets; CI needs nothing more.
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the run that is still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions are pinned to a full commit SHA (public repo): a tag can be moved, a SHA cannot.
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: go test -race -count=1 ./...
+
+  go-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          working-directory: server
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # The lint scripts run with --fix, so a lint problem would be fixed on the
+      # runner and pass. Fail instead if linting changed any file.
+      - name: lint
+        run: |
+          npm run lint
+          git diff --exit-code
+      - name: format
+        run: npx prettier --check src
+      - run: npm run typecheck
+      - run: npm run test -- --run
+      - run: npm run build-only
+
+  # The one job the branch rules require: green only if every job above is green.
+  ci:
+    if: always()
+    needs: [go-test, go-lint, web]
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ contains(needs.*.result, ''failure'') || contains(needs.*.result, ''cancelled'') }}" = "false" ]'

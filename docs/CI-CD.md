@@ -2,9 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 0.4 (draft) |
-| **Date** | 2026-11-14 |
+| **Version** | 0.5 (draft) |
+| **Date** | 2026-11-25 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) |
+
+**Changes in 0.5:** the first `ci.yml` exists (§4.1): Node 24 (the `engines` range in `web/package.json`), action versions updated, the `web` job fails when `--fix` linting changes a file and checks Prettier formatting.
 
 **Changes in 0.4:** an `umami` container and the `/api/collect` route for product analytics (§6.1, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)).
 
@@ -170,7 +172,7 @@ Jobs run in parallel:
 | `go-test` | `go test -race -count=1 ./...` (simulation, rating, match logic, codec; testify + mockery mocks) |
 | `go-integration` | `docker compose -f server/test/compose.yaml up -d --wait` (**Postgres 17 + Pub/Sub emulator**), then `go test -tags=integration -count=1 ./...`: Goose migrations on an empty DB, constraint tests, inbox idempotency |
 | `fuzz-short` | `go test -fuzz=. -fuzztime=30s ./internal/proto` |
-| `web` | `npm ci`, `eslint`, `vue-tsc`, `vitest --run`, `vite build` |
+| `web` | `npm ci`, oxlint + `eslint` (the scripts use `--fix`, so `git diff --exit-code` fails the job if linting changed a file), `prettier --check`, `vue-tsc`, `vitest --run`, `vite build` |
 | `contract` | Go & TS golden-vector tests for the codec. **Rule vectors:** a Go test reruns `cmd/vectorgen` and fails if `/protocol/testdata/rules` is stale; Vitest replays them through the TS prediction subset. **buf:** `buf lint`, `buf breaking` against the PR's base branch for `protocol/api` and `protocol/events`, and `buf generate` + `git diff --exit-code` so the committed generated code is current. `mockery` + `git diff --exit-code` does the same for mocks. |
 | `docker-build` | `docker buildx build` of all targets (no push), with the GitHub Actions cache backend |
 | `ci` | `needs:` all of the above. This is the one job the rulesets require. |
@@ -195,15 +197,15 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: server } }
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with: { go-version-file: server/go.mod, cache-dependency-path: server/go.sum }
       - run: go test -race -count=1 ./...
   go-integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with: { go-version-file: server/go.mod, cache-dependency-path: server/go.sum }
       - run: docker compose -f server/test/compose.yaml up -d --wait
       - working-directory: server
@@ -215,14 +217,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: web } }
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci && npm run lint && npm run typecheck && npm run test -- --run && npm run build
   contract:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }              # buf breaking needs the base branch
       - uses: bufbuild/buf-action@v1
         with:
