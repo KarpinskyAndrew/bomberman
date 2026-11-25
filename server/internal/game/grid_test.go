@@ -88,3 +88,17 @@ func TestParseGrid_Errors(t *testing.T) {
 		})
 	}
 }
+
+func TestValidSizes(t *testing.T) {
+	goodSizes := []int{15, 17, 21}
+	badSizes := []int{-5, 0, 16, 99}
+
+	for _, goodSize := range goodSizes {
+		require.True(t, ValidSize(goodSize))
+	}
+
+	for _, badSize := range badSizes {
+		require.False(t, ValidSize(badSize))
+	}
+
+}

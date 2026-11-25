@@ -3,6 +3,7 @@ package game
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -13,6 +14,8 @@ const (
 	HardWall
 	SoftWall
 )
+
+var sizes = []int{15, 17, 21}
 
 const MaxSize = 21
 
@@ -95,4 +98,9 @@ func (g Grid) String() string {
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+// ValidSize reports whether n is one of the map sizes 15, 17 or 21.
+func ValidSize(n int) bool {
+	return slices.Contains(sizes, n)
 }

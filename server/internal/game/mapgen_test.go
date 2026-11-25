@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var sizes = []int{15, 17, 21}
-
 const softWallPermille = 650
 
 func genMap(t *testing.T, size int, seed uint64) Grid {
