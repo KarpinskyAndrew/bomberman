@@ -39,7 +39,7 @@ func TestWebSocket(t *testing.T) {
 
 			conn, _, err := websocket.Dial(ctx, url, nil)
 			require.NoError(t, err)
-			defer conn.CloseNow()
+			defer func() { _ = conn.CloseNow() }()
 
 			var got ArenaState
 			require.NoError(t, wsjson.Read(ctx, conn, &got))

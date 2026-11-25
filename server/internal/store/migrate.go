@@ -23,7 +23,7 @@ func Migrate(ctx context.Context, databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("open db: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// The embed FS contains "migrations/…"; Goose wants the folder itself as the root.
 	files, err := fs.Sub(migrationsFS, "migrations")

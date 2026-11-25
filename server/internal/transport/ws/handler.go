@@ -21,7 +21,7 @@ func Play(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer conn.CloseNow()
+	defer func() { _ = conn.CloseNow() }()
 
 	size, err := strconv.Atoi(r.URL.Query().Get("size"))
 	if err != nil || !game.ValidSize(size) {
