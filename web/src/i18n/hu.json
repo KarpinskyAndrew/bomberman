@@ -9,5 +9,10 @@
       "large": "Nagy"
     },
     "play": "Játék"
+  },
+  "arena": {
+    "title": "Aréna",
+    "loading": "Az aréna betöltése…",
+    "unreachable": "Nem érhető el a játékszerver. Fut egyáltalán?"
   }
 }

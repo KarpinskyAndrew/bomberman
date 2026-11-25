@@ -9,5 +9,10 @@
       "large": "Large"
     },
     "play": "Play"
+  },
+  "arena": {
+    "title": "Arena",
+    "loading": "Loading the arena…",
+    "unreachable": "Could not reach the game server. Is it running?"
   }
 }

@@ -17,4 +17,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    proxy: {
+      '/play': { target: 'ws://localhost:8081', ws: true },
+    },
+  },
 })
