@@ -26,7 +26,7 @@ func TestWebSocket(t *testing.T) {
 		{"zero not a map size", "?size=0", 17},
 		{"16 not a map size", "?size=16", 17},
 		{"negative not a map size", "?size=-21", 17},
-		{"99 not a map size", "?size=-99", 17},
+		{"99 not a map size", "?size=99", 17},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
