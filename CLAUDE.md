@@ -4,36 +4,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and Ranked (ELO) and Unrated modes. **The repo currently contains only design docs** (`docs/`); no code has been written yet. The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game: 2–4 players per arena, a 21×21 grid, best-of-3 matches, AI aliens, and three modes: Ranked (1-vs-1, ELO), Unrated (2–4 players) and Solo (one player against the aliens). Work has started on the database layer (`server/internal/store`, `server/internal/account`); most of the design still lives only in the docs (`docs/`). The docs are the source of truth. Read the relevant one before implementing a feature, and update it when a design decision changes.
 
 | Doc | Covers |
 |---|---|
-| `docs/SPECIFICATION.md` | Game rules, accounts, ranking/ELO, REST API, PostgreSQL schema, milestones (M1–M8) |
+| `docs/SPECIFICATION.md` | Game rules, accounts, ranking/ELO, API (Gin + gRPC), deployment summary, milestones (M1–M8) |
 | `docs/SERVER-AND-NETWORK.md` | Go monorepo layout, simulation package, arena actor, binary protocol, prediction/interpolation |
-| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker |
-| `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), pgx + sqlc (no ORM), worked example |
+| `docs/EVENTS-AND-MESSAGING.md` | Three event classes, Pub/Sub, outbox/inbox, rating worker, product analytics (four layers, §12) |
+| `docs/BACKEND-ARCHITECTURE.md` | Go service layering (transport → service → domain), Gin + gRPC, pgx + sqlc (no ORM), Goose, testify + mockery, worked example |
+| `docs/DATABASE.md` | **Schema source of truth**: every table, constraint, FK and index, Go type mapping, roles, migration plan |
 | `docs/GUI-PLAN.md` | Vue app structure, stores, canvas renderer, client event handling |
-| `docs/CI-CD.md` | Cloud Build pipelines, Cloud Deploy, Terraform, migration policy, branching model, public-repo safeguards |
+| `docs/agile_steps.md` | Sprint plan: v1 in 1-week sprints, each ending with a playable demo; weekly playtests from sprint 2 (tunnel), first full game in sprint 4, live URL in sprint 5, solo mode in sprint 8; maps milestones and acceptance criteria to sprints |
+| `docs/CI-CD.md` | GitHub Actions pipelines, the v1 single-VM Docker Compose deployment, migration policy, branching model, public-repo safeguards, path to GKE + Helm |
+
+## Test-first development (mandatory)
+
+Every function starts with a **failing test**, then the code that makes it pass (red → green → refactor):
+
+1. **Red:** write the test for the new behavior first. Add only a stub (zero values, `panic("not implemented")`, an empty component) so the test compiles, run it, and **see it fail for the right reason** (a wrong result, not a compile error).
+2. **Green:** write the simplest code that makes the test pass.
+3. **Refactor:** clean up with the tests green.
+
+This applies to Go (`testing` + testify), TypeScript and Vue (Vitest, Vue Test Utils) alike, and to bug fixes: first a test that reproduces the bug, then the fix. Commit the test together with the code that makes it pass, never code without its test. Exceptions are code with nothing to assert: generated code (sqlc, buf, mockery), wiring in `cmd/*/main.go`, and config files. Canvas drawing is tested through the logic it draws from, not by its pixels.
 
 ## Git workflow (mandatory)
 
-- **Allowed:** create `feature/<topic>` or `bugfix/<topic>` branches from `dev`, commit to them, push them, and open pull requests with `gh pr create --base dev`.
-- **Never** merge, approve, close or otherwise complete a pull request (no `gh pr merge`, no `gh pr review --approve`, no `gh pr close`). The repo owner reviews every diff and finishes PRs themselves.
+- **Allowed:** create `feature/<topic>` or `bugfix/<topic>` branches from `dev`, commit to them, push them, merge branches locally (e.g. `dev` into a feature branch, or one feature branch into another), and open pull requests with `gh pr create --base dev`.
+- **HARD RULE: never complete a pull request.** Completing PRs is done manually by the repo owner. That means no merging, approving, closing or auto-merging a PR by any means: no `gh pr merge` (including `--auto`), no `gh pr review --approve`, no `gh pr close`, no GitHub API calls that do the same. The owner reviews every diff and finishes PRs themselves.
 - **Never** commit or push directly to `dev` or `main`, and never force-push them.
-- Merge policy, which the owner carries out:
-  - feature/bug PRs → `dev` are **squash merged**, so keep the branch rebased on `dev`.
-  - `dev` → `main` is **fast-forward only**.
-- The repository is **public**. Never commit secrets, `.env` files, keys or sensitive `*.tfvars`.
+- **Commit authorship:** every commit must be authored and committed as `KarpinskyAndrew <kbandee87@gmail.com>`, never as Claude. Don't add `Co-Authored-By: Claude` trailers or "Generated with Claude Code" lines to commit messages or PR descriptions. Check `git config user.name` / `user.email` before committing, or pass `--author="KarpinskyAndrew <kbandee87@gmail.com>"`.
+- **Merge policy** (the owner carries out the PR merges):
+  - **All `feature/*` and `bugfix/*` branches go to `dev` with squash-and-rebase.** Before opening or updating a PR, rebase the branch onto the latest `dev` (`git fetch && git rebase origin/dev`) and fix any conflicts. Then the PR lands on `dev` as one squashed commit on top of `dev`, so `dev` history stays linear with no merge commits. Never target `main` from a feature or bug branch.
+  - **`dev` → `main` is fast-forward only.** `main` must always be an ancestor of `dev`, so there are never merge commits or extra commits on `main`.
+- The repository is **public**. Never commit secrets, `.env` / `local.env` files or keys.
 
 The build order follows the milestones in `SPECIFICATION.md` §12, starting with M1, the core simulation in `server/internal/game`.
 
 ## Stack and planned layout
 
-- `server/`: one Go 1.25+ module that builds one container image. Binaries live in `cmd/`: `api` (REST, chi), `gameserver`, `worker` (rating), `bots`, `vectorgen`. Uses pgx with golang-migrate, and `coder/websocket`.
-- `web/`: Vue 3, TypeScript (strict), Vite, Pinia, Tailwind, Canvas 2D. Tested with Vitest and Playwright.
-- `protocol/`: golden binary codec vectors, generated rule vectors (`testdata/rules/`), and the Protobuf schemas for domain events (`events/`).
-- `infra/` (Terraform), `cloudbuild/`, `deploy/` (Cloud Deploy + Skaffold).
-- PostgreSQL 17, GCP, **EU regions only**.
+- `server/`: one Go module that builds one container image. Binaries live in `cmd/`: `api` (Gin HTTP for auth/health + gRPC services), `gameserver`, `worker` (rating, Pub/Sub pull), `migrate` (Goose), `bots`, `vectorgen`. Uses pgx + sqlc, Goose, `coder/websocket`, OpenTelemetry, Sentry. Tests: `testing` + testify, mockery mocks.
+- `web/`: Vue 3, TypeScript (strict), Vite, Pinia, Vue Router, Tailwind, vue-i18n, Canvas 2D, gRPC-Web clients generated by buf. Tested with Vitest and Playwright.
+- `protocol/`: buf workspace. gRPC API (`api/`), domain event schemas (`events/`), golden binary codec vectors and generated rule vectors (`testdata/rules/`).
+- `deploy/`: the v1 production stack (Docker Compose, Caddy, Envoy, OTel Collector, Prometheus, Grafana, deploy scripts). `.github/workflows/`: CI/CD on GitHub Actions. **No Terraform.**
+- PostgreSQL 17, GCP (one Compute Engine VM + Pub/Sub in v1), **EU regions only**.
 
 ## Commands (planned, from `docs/CI-CD.md`)
 
@@ -45,13 +58,20 @@ go test -race -run TestName ./internal/game      # single test
 go test -tags=integration -count=1 ./...          # needs server/test/compose.yaml (Postgres 17 + Pub/Sub emulator), DATABASE_URL, PUBSUB_EMULATOR_HOST
 go test -fuzz=. -fuzztime=30s ./internal/proto    # protocol decoder fuzzing
 go run ./cmd/vectorgen                            # regenerate /protocol/testdata/rules after any rule change
+go run ./cmd/migrate                              # apply Goose migrations (needs DATABASE_URL)
+sqlc generate                                     # after changing queries/*.sql or migrations
+mockery                                           # regenerate mocks after changing a mocked interface
 
 # web/
 npm run lint; npm run typecheck; npm run test -- --run; npm run build
 npx vitest run path/to/file.test.ts               # single test
 
 # protocol/
-buf lint; buf breaking protocol/events --against '.git#branch=main,subdir=protocol/events'
+buf lint; buf generate                            # Go → server/internal/gen, TS → web/src/gen (committed)
+buf breaking --against '.git#branch=dev,subdir=protocol'
+
+# local stack
+docker compose -f server/compose.yaml --env-file server/local.env up -d --wait
 ```
 
 ## Architecture rules that span multiple files
@@ -86,4 +106,6 @@ buf lint; buf breaking protocol/events --against '.git#branch=main,subdir=protoc
 
 **DB migrations** are forward-only and follow expand → migrate → contract. The previous release must keep working against the new schema, so rollbacks never need a down-migration.
 
-**v1 vs. v2:** v1 runs a single Cloud Run game server over WebSocket. v2 adds multi-region GKE, a gateway, Redis and WebTransport. Keep the transport behind an interface so it can be swapped.
+**API transports:** Gin serves only what needs plain HTTP (auth endpoints with the `HttpOnly` refresh cookie, health, ping, metrics). Every other client API is a gRPC service defined in `protocol/api` and reached from the browser as gRPC-Web through Envoy. Game traffic stays on the WebSocket binary protocol. Generated protobuf types stay in the transport layer (`internal/grpcapi`).
+
+**v1 vs. v2:** v1 is **one Compute Engine VM running Docker Compose** (Caddy, Envoy, api, gameserver, worker, Postgres, observability), deployed by GitHub Actions. Don't add infrastructure that needs more than that box in v1. v2 moves the same images to GKE with Helm, Cloud SQL, Redis, a gateway, several regions and WebTransport. Keep transport, publisher and store behind interfaces so that move needs no game-code changes.

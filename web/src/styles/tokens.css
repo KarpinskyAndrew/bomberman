@@ -1,0 +1,270 @@
+/*
+ * Design tokens (docs/DESIGN-SYSTEM.md section 2).
+ *
+ * Retro is the default theme; [data-theme="modern"] overrides the same variable
+ * names further down, so every utility switches theme at runtime without a rebuild.
+ *
+ * Tokens inside @theme become Tailwind utilities (bg-surface, rounded-panel, text-md ...).
+ * Tokens Tailwind would inline at build time (shadows) or that have no Tailwind
+ * namespace (sizes, z-index, blur, gradients, durations) live in :root and are used
+ * with the variable shorthand: shadow-(--shadow-modal), h-(--size-control), z-(--z-modal).
+ */
+
+@theme static {
+  /* Only our tokens exist: no default palette, breakpoints, radii or text sizes. */
+  --color-*: initial;
+  --breakpoint-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+
+  /* ---------- 2.1 UI colors ---------- */
+  --color-bg: #0a0e18;
+  --color-surface: #111726;
+  --color-surface-2: #161d30;
+  --color-surface-3: #1c2439;
+  --color-field: #0d1220;
+  --color-glass: #111726;
+  --color-glass-strong: rgb(17 23 38 / 0.94);
+  --color-bar: rgb(10 14 24 / 0.86);
+  --color-hud-bar: rgb(10 14 24 / 0.92);
+  --color-stage: #070a12;
+  --color-scrim: rgb(5 7 12 / 0.72);
+  --color-track: #2b3247;
+  --color-edge: rgb(255 255 255 / 0.08);
+  --color-edge-strong: rgb(255 255 255 / 0.14);
+  --color-ink: #f3f1ea;
+  --color-muted: #a7adbd;
+  --color-dim: #6f768b;
+  --color-on-accent: #1d1305;
+  --color-on-player: #0a0e18;
+  --color-fire-1: #ffdd55;
+  --color-fire-2: #ff8a1f;
+  --color-fire-3: #ff3d2e;
+  --color-ok: #47d16c;
+  --color-bad: #ff4d5a;
+  --color-info: #4da3ff;
+  --color-warn: #ffdd55;
+  --color-p1: #4da3ff;
+  --color-p2: #ff9a3c;
+  --color-p3: #47d16c;
+  --color-p4: #e46bd6;
+  --color-tier-bronze: #cd8a50;
+  --color-tier-silver: #b9c3d3;
+  --color-tier-gold: #f2c14e;
+  --color-tier-platinum: #67d4cf;
+  --color-tier-diamond: #8fb8ff;
+  --color-alien-drifter: #5fd35a;
+  --color-alien-seeker: #9b5de5;
+  --color-alien-brute: #c0392b;
+
+  /* ---------- 2.3 Typography ---------- */
+  --font-display: 'Bungee', 'Arial Black', 'Segoe UI Black', Impact, system-ui, sans-serif;
+  --font-ui:
+    Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --font-code: var(--font-display); /* Q3: maybe monospace in both themes */
+  --font-weight-display: 400;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-base: 15px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-page: clamp(24px, 4vw, 32px);
+  --text-hero: clamp(44px, 10vw, 84px);
+  --text-countdown: clamp(96px, 18vw, 180px);
+  --text-404: clamp(90px, 22vw, 180px);
+
+  --tracking-display: 0.02em;
+  --tracking-hero: normal;
+  --tracking-label: 0.06em;
+  --tracking-code: 0.14em;
+
+  /* ---------- 2.5 Radii ---------- */
+  --radius-control-sm: 8px;
+  --radius-control: 10px;
+  --radius-control-lg: 12px;
+  --radius-badge: 6px;
+  --radius-kbd: 7px;
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  --radius-tile: 16px;
+  --radius-modal: 18px;
+  --radius-sheet: 20px;
+  --radius-avatar: 9px;
+  --radius-pill: 999px;
+
+  /* ---------- 2.8 Motion (easings) ---------- */
+  --ease-out: ease-out;
+  --ease-pop: cubic-bezier(0.2, 0.9, 0.3, 1.2);
+
+  /* ---------- 2.9 Breakpoints (mobile first) ---------- */
+  --breakpoint-sm: 30rem;
+  --breakpoint-md: 40rem;
+  --breakpoint-lg: 56.25rem;
+  --breakpoint-xl: 62.5rem;
+  --breakpoint-2xl: 73.75rem;
+}
+
+:root {
+  /* Gradients (2.1) */
+  --gradient-fire: linear-gradient(180deg, var(--color-fire-1), var(--color-fire-2));
+  --gradient-fire-title: linear-gradient(
+    180deg,
+    var(--color-fire-1) 0%,
+    var(--color-fire-2) 55%,
+    var(--color-fire-3) 100%
+  );
+  --gradient-fire-hover: linear-gradient(180deg, #ffe57a, #ff9a3c);
+  --gradient-glass-hi: none;
+
+  /* Shadows, glows, blur (2.6) */
+  --shadow-focus: 0 0 0 3px rgb(255 138 31 / 0.18);
+  --shadow-focus-error: 0 0 0 3px rgb(255 77 90 / 0.15);
+  --shadow-accent: 0 8px 24px rgb(255 138 31 / 0.25);
+  --shadow-lift: 0 0 #0000;
+  --shadow-inset-hi: 0 0 #0000;
+  --shadow-panel: 0 0 #0000;
+  --shadow-modal: 0 30px 90px rgb(0 0 0 / 0.55);
+  --shadow-overlay: 0 30px 80px rgb(0 0 0 / 0.5);
+  --shadow-toast: 0 16px 40px rgb(0 0 0 / 0.45);
+  --blur-glass: none;
+  --blur-scrim: blur(4px);
+
+  /* Component sizes (2.4) */
+  --size-control-sm: 32px;
+  --size-control: 42px;
+  --size-control-lg: 52px;
+  --size-icon-btn: 38px;
+  --size-icon-btn-sm: 30px;
+  --size-topbar: 62px;
+  --size-hud-top: 58px;
+  --size-hud-side: 250px;
+  --size-killfeed: 46px;
+  --size-touch-bar: 48px;
+  --size-page: 1180px;
+  --size-modal-sm: 400px;
+  --size-modal: 460px;
+  --size-modal-wide: 680px;
+  --size-results: 900px;
+  --size-avatar-sm: 32px;
+  --size-avatar-md: 64px;
+  --size-avatar-lg: 80px;
+  --size-avatar-xl: 84px;
+  --size-ring: 76px;
+
+  /* Z-index layers (2.7) */
+  --z-raised: 2;
+  --z-stage-flash: 3;
+  --z-stage-hint: 4;
+  --z-stage-overlay: 5;
+  --z-topbar: 20;
+  --z-modal: 60;
+  --z-toast: 70;
+  --z-debug: 100;
+
+  /* Motion durations (2.8). --motion-scale drops to 0 under reduced motion (main.css). */
+  --motion-scale: 1;
+  --duration-press: 80ms;
+  --duration-hover: 150ms;
+  --duration-fade: 180ms;
+  --duration-modal: 220ms;
+  --duration-shake: 400ms;
+  --duration-pop: 600ms;
+}
+
+/* ---------- Modern theme: same names, new values ---------- */
+:root[data-theme='modern'] {
+  --color-bg: #070a13;
+  --color-surface: #0e1322;
+  --color-surface-2: #131a2c;
+  --color-surface-3: #1b2339;
+  --color-field: rgb(255 255 255 / 0.035);
+  --color-glass: rgb(12 16 28 / 0.62);
+  --color-glass-strong: rgb(12 16 28 / 0.84);
+  --color-bar: rgb(8 11 20 / 0.62);
+  --color-hud-bar: rgb(8 11 20 / 0.8);
+  --color-stage: #060912;
+  --color-scrim: rgb(4 6 12 / 0.6);
+  --color-track: rgb(255 255 255 / 0.12);
+  --color-edge: rgb(255 255 255 / 0.09);
+  --color-edge-strong: rgb(255 255 255 / 0.15);
+  --color-dim: #858da3;
+  --color-ok: #3ddc84;
+  --color-bad: #ff5468;
+  --color-info: #5aa9ff;
+  --color-p1: #2f9be6;
+  --color-p2: #f5b034;
+  --color-p3: #19c29a;
+  --color-p4: #e79bcb;
+  --color-tier-bronze: #e09a5f;
+  --color-tier-silver: #c3cddd;
+  --color-tier-gold: #f5c84f;
+  --color-tier-platinum: #6fe0da;
+  --color-tier-diamond: #9cc2ff;
+  --color-alien-drifter: #4ade80;
+  --color-alien-seeker: #a78bfa;
+  --color-alien-brute: #fb4f6b;
+
+  --font-display:
+    Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-code: var(--font-mono);
+  --font-weight-display: 800;
+
+  --text-2xs: 10.5px;
+  --text-xl: 19px;
+  --text-page: clamp(26px, 4vw, 36px);
+  --text-hero: clamp(42px, 9vw, 76px);
+
+  --tracking-display: -0.02em;
+  --tracking-hero: -0.035em;
+  --tracking-label: 0.14em;
+  --tracking-code: 0.22em;
+
+  --radius-control-sm: 10px;
+  --radius-control: 12px;
+  --radius-control-lg: 14px;
+  --radius-badge: 999px;
+  --radius-kbd: 8px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-tile: 20px;
+  --radius-modal: 22px;
+  --radius-sheet: 24px;
+  --radius-avatar: 50%;
+
+  --ease-pop: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --gradient-fire: linear-gradient(
+    180deg,
+    var(--color-fire-1) 0%,
+    var(--color-fire-2) 55%,
+    var(--color-fire-3) 100%
+  );
+  --gradient-fire-hover: linear-gradient(180deg, #ffe68a, #ff9a3c 55%, #ff5a3c);
+  --gradient-glass-hi: linear-gradient(180deg, rgb(255 255 255 / 0.045), transparent 42%);
+
+  --shadow-focus: 0 0 0 3px rgb(255 138 31 / 0.16), 0 0 24px -6px rgb(255 138 31 / 0.6);
+  --shadow-focus-error: 0 0 0 3px rgb(255 84 104 / 0.15), 0 0 22px -8px rgb(255 84 104 / 0.7);
+  --shadow-accent: 0 10px 32px -10px rgb(255 120 30 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.35);
+  --shadow-lift: 0 24px 60px -24px rgb(0 0 0 / 0.7);
+  --shadow-inset-hi: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --shadow-panel: var(--shadow-lift), var(--shadow-inset-hi);
+  --shadow-modal:
+    0 30px 90px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.3);
+  --shadow-overlay: 0 30px 80px rgb(0 0 0 / 0.55);
+  --shadow-toast: 0 16px 40px rgb(0 0 0 / 0.45);
+  --blur-glass: blur(14px) saturate(125%);
+  --blur-scrim: blur(8px);
+
+  --duration-press: 120ms;
+  --duration-hover: 200ms;
+  --duration-modal: 320ms;
+}
+
+/* For the few places where the themes differ in more than a value. */
+@custom-variant modern (&:where([data-theme="modern"], [data-theme="modern"] *));
+@custom-variant retro (&:where([data-theme="retro"], [data-theme="retro"] *));

@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/* Self-hosted fonts (DESIGN-SYSTEM 4.3, Q9): no third-party font requests. */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/bungee/400.css';
+
+@layer base {
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* GUI-PLAN 11: visible focus rings on every menu. */
+  :focus-visible {
+    outline: 2px solid var(--color-fire-1);
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion: the OS setting or the in-app setting (data-motion="reduce"), one result. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale: 0;
+  }
+}
+:root[data-motion='reduce'] {
+  --motion-scale: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+@keyframes bm-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bm-pop-in {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes bm-blink {
+  50% {
+    opacity: 0.4;
+  }
+}
+@keyframes bm-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+@theme {
+  --animate-fade-in: bm-fade-in var(--duration-fade) var(--ease-out);
+  --animate-pop-in: bm-pop-in var(--duration-modal) var(--ease-pop);
+  --animate-blink: bm-blink 1s steps(2) infinite;
+  --animate-shake: bm-shake var(--duration-shake) var(--ease-out);
+}

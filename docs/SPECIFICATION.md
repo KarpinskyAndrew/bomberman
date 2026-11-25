@@ -2,22 +2,28 @@
 
 | | |
 |---|---|
-| **Version** | 0.6 (draft) |
-| **Date** | 2026-11-01 |
-| **Stack** | Go (backend / game server), Vue 3 (frontend), **PostgreSQL** (database), Google Cloud Platform (hosting) |
+| **Version** | 0.11 (draft) |
+| **Date** | 2026-11-14 |
+| **Stack** | Go (Gin, gRPC + buf, pgx, Goose), Vue 3 + TypeScript (Vite, Pinia, Tailwind, gRPC-Web), **PostgreSQL 17**, Envoy, Google Cloud (one Compute Engine VM in v1, Pub/Sub), GitHub Actions, OpenTelemetry + Prometheus + Sentry |
 
 Related documents:
 
 - [GUI Plan (Vue)](./GUI-PLAN.md): screens, components, rendering, input, UX.
 - [Server & Network Design](./SERVER-AND-NETWORK.md): game server internals, binary protocol, latency minimization, deployment topology.
 - [Events & Messaging](./EVENTS-AND-MESSAGING.md): event handling (in-game, notifications, domain events), the message queue decision, and the ELO pipeline.
-- [CI/CD on GCP](./CI-CD.md): Cloud Build, Artifact Registry, Cloud Deploy, Terraform pipelines.
-- [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, database access (pgx + sqlc, no ORM), a worked example and learning resources.
+- [CI/CD and v1 Deployment](./CI-CD.md): GitHub Actions, Artifact Registry, the single-VM Docker Compose deployment, and the path to GKE + Helm.
+- [Go Backend Architecture](./BACKEND-ARCHITECTURE.md): layers, domain model, Gin + gRPC transport, database access (pgx + sqlc, no ORM), testing with testify + mockery, a worked example and learning resources.
+- [Database Design](./DATABASE.md): the PostgreSQL schema (tables, constraints, FKs, indexes), its Go mapping, roles and migration plan.
 
 ### Changelog
 
 | Version | Changes |
 |---|---|
+| 0.11 | **Product analytics** in four layers (§8, [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)): cookieless Umami from the live URL, funnel counters in Prometheus, an own event pipeline into BigQuery, and consent-gated heatmaps only on demand. No consent banner for the first three; all data stays in the EU. |
+| 0.10 | New **Solo mode** (§4.9): one player against the aliens, for when few players are online. Single round, never rated, open to guests; survive the 3 minutes to win, and the score is the number of aliens killed. Difficulty sets the alien count (2 / 4 / 6). "PvE-only modes" leaves the non-goals; co-op stays out. Registered players' solo runs are stored ([DATABASE 0.4](./DATABASE.md)). New acceptance criterion 17. |
+| 0.9 | **Ranked is 1-vs-1 only**, best-of-3, for registered players only. Rating uses standard two-player ELO (§5.4.3), replacing the pairwise multiplayer method. **Unrated matches (2–4 players) are a single round.** The waiting room starts a match with a **15 s all-ready countdown** instead of a host Start button (§5.2). Registration asks for the password twice. **Touch controls** (virtual joystick + bomb button) move into v1. **Arena size** is a setting: Small 15×15, Medium 17×17, Large 21×21, defaulting to the player count; Ranked is always Small (§4.1). |
+| 0.8 | **v1 runs on one server**: a Compute Engine VM with Docker Compose (§8). GKE + Helm is the v2 scaling step. The API is split into **Gin** (auth with cookies, health) and **gRPC services** defined with **buf**, reached from the browser through **Envoy** (gRPC-Web) (§6.1). Migrations use **Goose**. CI/CD moves to **GitHub Actions**. Observability is **OpenTelemetry, Prometheus/Grafana and Sentry**. Pub/Sub stays. |
+| 0.7 | The schema moves to **[DATABASE.md](./DATABASE.md)**, and §7 now only summarizes it. Per-round player results become a table (`match_round_players`) instead of JSONB. Password hashes move to `user_credentials`. |
 | 0.6 | **Go confirmed** for the backend after reviewing the alternatives (§6.2). The game rules stay in Go. The client re-implements only what it predicts (own movement and bomb placement), and **shared test vectors generated from the Go simulation** keep the two in sync. The networking code we write ourselves is listed and sized in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy). |
 | 0.5 | Confirmed 3 HP, 2–4 players and tile-by-tile movement. At the time-out, **the player with less HP loses** (§4.8.2). **EU-only regions** with EU data residency (§8.1). Added the **CI/CD on GCP** design ([CI-CD.md](./CI-CD.md)). |
 | 0.4 | A **match is now best-of-3 rounds** (§4.8). ELO is applied once per match, from the match placement. There are two game modes, **Ranked** and **Unrated** ("casual" renamed). Permanent rating with **no seasons in v1**. Data model gains `match_rounds`. |
@@ -29,10 +35,11 @@ Related documents:
 
 ## 1. Overview
 
-BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a 21×21 grid, place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Each match is played as **best of 3 rounds**. Arenas run in one of two game modes:
+BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Players can **register**, **log in**, or **play anonymously as a guest**. Many **battle arenas** run at the same time, and each one holds its own independent match. Inside an arena, players move around a grid of 15×15 to 21×21 tiles (smaller for fewer players), place bombs with **SPACE**, blow up destructible walls, avoid and hunt deadly computer-controlled **aliens**, collect power-ups and try to be the last one standing. Arenas run in one of three game modes:
 
-- **Ranked:** registered players earn or lose **ELO rating**.
-- **Unrated:** just for fun.
+- **Ranked:** a **1-vs-1** duel between two registered players, played as **best of 3 rounds**. The winner gains **ELO rating** and the loser loses it.
+- **Unrated:** **2–4 players**, a **single round**, just for fun.
+- **Solo:** **one player against the aliens**, a single round. There is always something to play, even when nobody else is online (§4.9).
 
 ### 1.1 Goals
 
@@ -41,14 +48,13 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 - Getting into a game takes little effort: a guest can play within 2 clicks.
 - The server is authoritative, so clients cannot cheat on positions, bombs or damage.
 - A fair, tamper-resistant **ELO rating**, where match results are **never lost** even if the database is temporarily unavailable.
-- Simple to deploy and run on GCP.
+- Simple to deploy and run: **one server in v1** (§8), with a clear path to scale out on GKE in v2.
 
 ### 1.2 Non-goals (v1)
 
-- **Co-op / PvE-only modes.** Aliens exist only inside PvP arenas.
-- Mobile/touch controls (desktop keyboard only in v1).
+- **Co-op modes.** Several players teaming up against the aliens is out of scope. One player against the aliens is in scope as Solo mode (§4.9).
 - In-game chat (lobby chat is a v1.1 candidate).
-- Strict skill-based matchmaking. Quick Play only *prefers* arenas with similar ratings (§5.1).
+- A ranked matchmaking queue. Ranked opponents are found through the arena list, and Quick Play only *prefers* arenas with a similar rating (§5.1).
 - Spectator mode for people outside the match (eliminated players still spectate their own match).
 
 ---
@@ -59,8 +65,8 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 |---|---|
 | **Arena** | A game room. It has its own map, players, aliens and match lifecycle. |
 | **Round** | A single game: one map, from countdown to the last player standing (or a draw). |
-| **Match** | A **best-of-3** series of rounds in an arena (configurable Bo1/Bo3/Bo5 in Unrated mode). ELO is applied per match. |
-| **Tile** | One cell of the 21×21 grid. |
+| **Match** | What an arena plays from start to final standings. **Ranked:** a best-of-3 series of rounds between 2 players. **Unrated:** exactly 1 round. **Solo:** exactly 1 round, also called a *run*. ELO is applied per ranked match. |
+| **Tile** | One cell of the arena grid (15×15, 17×17 or 21×21, §4.1). |
 | **Hard wall** | An indestructible wall. |
 | **Soft wall** | A destructible wall that is placed randomly and can be destroyed by fire. |
 | **Fire / blast** | The cross-shaped explosion a bomb produces. |
@@ -69,7 +75,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 | **Alien** | A computer-controlled enemy (NPC). Touching one kills a player instantly. |
 | **Tick** | One step of the server simulation (60 Hz). |
 | **Guest** | An anonymous player with no account. |
-| **Game mode** | **Ranked** (standard rules locked, best-of-3, rated) or **Unrated** (custom rules allowed, never rated). Set per arena. |
+| **Game mode** | **Ranked** (1-vs-1, registered players only, standard rules locked, best-of-3, rated), **Unrated** (2–4 players, guests welcome, custom rules allowed, single round, never rated) or **Solo** (1 player against the aliens, guests welcome, single round, never rated, §4.9). Set per arena. |
 | **Rated match** | A Ranked match that meets the eligibility rules and therefore changes ELO (§5.4.2). |
 | **ELO** | A skill rating system. Everyone starts at 1200, and each rated match moves rating points between players. |
 | **Game event** | A real-time fact that happened inside an arena (bomb exploded, wall destroyed…), sent to clients. |
@@ -83,12 +89,13 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 
 | Role | Can do |
 |---|---|
-| **Guest** | Choose a nickname (or have one generated), browse arenas, join/create arenas, play (including in ranked arenas, but **unrated**). Stats are **not** persisted. |
-| **Registered user** | Everything a guest can do, plus a persistent profile, match history, statistics, an **ELO rating**, a leaderboard position and a reserved username. |
+| **Guest** | Choose a nickname (or have one generated), browse all arenas, join/create and play **Unrated** arenas, and play **Solo**. Guests see Ranked arenas in the list but **cannot join them** ("Register to play Ranked"). Stats are **not** persisted. |
+| **Registered user** | Everything a guest can do, plus **Ranked** play, a persistent profile, match history, statistics (including the **solo best score**), an **ELO rating**, a leaderboard position and a reserved username. |
 
 ### 3.2 Registration
 
 - Fields: `username` (3–16 chars, `[A-Za-z0-9_]`, unique and case-insensitive), `email` (unique, valid format) and `password` (min. 8 chars).
+- The form asks for the password **twice** (`password` + `confirm password`). The client checks that both match before submitting, and the submit button stays disabled until they do. The API receives the password only once: the confirmation is a typo guard in the UI, not a server field.
 - Passwords are hashed with **argon2id** (or bcrypt with cost ≥ 12).
 - After a successful registration the user is logged in automatically, and a rating row (1200, provisional) is created.
 - *(v1.1)* Email verification and password reset by email.
@@ -107,7 +114,7 @@ BomberMan Online is a browser-based, real-time multiplayer Bomberman game. Playe
 - "Play as guest" asks for an optional nickname. If none is given, one is generated (e.g. `Guest-4821`).
 - The server issues a **guest JWT** (`role: guest`, random `guestId`), valid for 24 h.
 - Guest nicknames get a visible marker in game (e.g. grey name or a "guest" tag) and cannot impersonate registered usernames.
-- Guests have no rating and are **ignored by ELO calculations** (§5.4.3).
+- Guests have no rating and **cannot join Ranked arenas** (§5.4.2). The server rejects `arena.join` for a guest with `ranked_requires_account`.
 
 ---
 
@@ -117,22 +124,35 @@ All durations below are given in seconds. The server counts them in **ticks at 6
 
 ### 4.1 Map
 
-- The grid is **21 × 21** tiles. Coordinates are `(x, y)` with `0 ≤ x, y ≤ 20` and the origin at the top-left.
+- The grid is square, **S × S** tiles, with three sizes:
+
+  | Size | S | Default for | Default max aliens | Sudden-death speed |
+  |---|---|---|---|---|
+  | **Small** | **15** | 2 players, and **always in Ranked** | 2 | 1 tile / 0.75 s [45 ticks] |
+  | **Medium** | **17** | 3 players | 3 | 1 tile / 0.65 s [39 ticks] |
+  | **Large** | **21** | 4 players | 4 | 1 tile / 0.5 s [30 ticks] |
+
+  - Fewer players get a smaller arena, so a duel doesn't turn into a long search for the opponent, and the arena stays readable on a phone.
+  - The size follows the max players by default. In **Unrated**, the host can pick any size (e.g. 4 players on Small for chaos). **Ranked** is always Small.
+  - S is always odd, so the border and pillar pattern below works the same for every size.
+- Coordinates are `(x, y)` with `0 ≤ x, y ≤ S − 1` and the origin at the top-left.
 - **Hard walls (indestructible):**
-  - The outer border: every tile with `x = 0`, `x = 20`, `y = 0` or `y = 20`.
+  - The outer border: every tile with `x = 0`, `x = S − 1`, `y = 0` or `y = S − 1`.
   - Pillars on every second row and column: every tile where **both `x` and `y` are even**.
 - **Every other tile** (odd x or odd y, not on the border) is either **empty** or a **soft wall**, decided randomly when the match is generated:
   - Soft wall density: **65 %** by default (configurable in Unrated arenas: 40–85 %).
   - **Every round gets a new random map.**
   - **Spawn safe zones** are always empty: the spawn tile plus the two tiles next to it along the corridors (an L shape). This guarantees that a player can place a bomb and escape.
-- Spawn points (up to 4 players), one per corner:
+- Spawn points (up to 4 players), one per corner. With `E = S − 2` (the last walkable row/column: 13, 15 or 19):
 
   | Slot | Spawn | Safe tiles |
   |---|---|---|
   | P1 | (1, 1) | (2, 1), (1, 2) |
-  | P2 | (19, 1) | (18, 1), (19, 2) |
-  | P3 | (1, 19) | (2, 19), (1, 18) |
-  | P4 | (19, 19) | (18, 19), (19, 18) |
+  | P2 | (E, 1) | (E − 1, 1), (E, 2) |
+  | P3 | (1, E) | (2, E), (1, E − 1) |
+  | P4 | (E, E) | (E − 1, E), (E, E − 1) |
+
+  - With **2 players** they start in **opposite corners**: P1 at (1, 1) and P2 at (E, E). With 3 players the corners are P1, P2, P3 as listed.
 
 - The map generator uses a seeded PRNG. Each round has its own seed, stored with the match, so the map, and with the recorded inputs the whole round, can be reproduced and debugged.
 
@@ -174,14 +194,16 @@ Legend: # hard wall   + soft wall (random)   . empty   1-4 spawn
 
 ### 4.3 Controls
 
-| Action | Keys |
-|---|---|
-| Move | Arrow keys **or** W A S D |
-| Place bomb | **SPACE** |
-| Open menu / leave arena | ESC |
+| Action | Keyboard | Touch (phones, tablets) |
+|---|---|---|
+| Move | Arrow keys **or** W A S D | **Virtual joystick**, bottom-left |
+| Place bomb | **SPACE** | **Bomb button**, bottom-right |
+| Open menu / leave arena | ESC | ☰ button, top corner |
 
 - If several direction keys are held at once, the most recently pressed one wins.
 - Holding a direction keeps moving the player tile by tile.
+- **Touch:** the joystick is a floating circle. It appears where the thumb lands in the left half of the screen, and the thumb's offset from that point picks the direction. Movement is tile-by-tile, so the offset is snapped to the nearest of the **4 directions**, with a dead zone in the middle (stop). Holding the thumb off-center works like holding a key. The touch layout is used when the device's primary pointer is coarse (`pointer: coarse`); keyboard hints are hidden then.
+- Touch input produces exactly the same commands as the keyboard (direction held, bomb pressed), so prediction and the server need no changes.
 
 ### 4.4 Movement & tile occupancy
 
@@ -244,6 +266,8 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 | **Brute** | Red armored | 3 | 0.35 s [21 ticks] | Hunts like a Seeker within **5 tiles** but does not avoid danger. After each hit it is invulnerable for 1 s [60 ticks] and blinks. | **2** |
 
 - Every alien is **slower than a player** (player: 9 ticks per tile). Because contact is lethal, a player can always outrun an alien in an open corridor.
+- **The Behavior column is provisional.** How aliens move will be decided by playtests. Candidates range from pure random walking, over the pursuit described above, to aliens that play like a player (going for collectibles, cutting off escape routes). Look, HP, speed and drops are fixed; the movement logic is not.
+- Because of that, alien movement is built as **interchangeable behaviors** (a strategy per alien, [Server & Network §3.2](./SERVER-AND-NETWORK.md#32-the-simulation-package-internalgame)): each behavior only answers "which direction next?", and everything else (contact kill, damage, drops, spawning) is the same for all of them. A new behavior can be added, or assigned to an alien type, without touching the rest of the simulation.
 
 #### 4.7.2 Interaction rules
 
@@ -253,7 +277,7 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 
   HP and invulnerability do **not** protect against this.
 - **Telegraphing** (required, because contact is lethal):
-  - A hunting Seeker or Brute changes appearance when it locks on, e.g. its eye turns red (see GUI Plan).
+  - If a behavior hunts players, the alien changes appearance while it does, e.g. its eye turns red (see GUI Plan). There is no line or marker pointing from an alien to its target.
   - A spawn portal glows for 1.5 s before an alien appears, and portal tiles are harmless.
 - Aliens are blocked by hard walls, soft walls and bombs. They **cannot** place bombs or destroy walls.
 - Aliens do not block or harm each other, and they may overlap.
@@ -264,36 +288,41 @@ Aliens are NPCs that the server simulates in the same tick loop as players. **To
 
 #### 4.7.3 Spawning
 
-- Arena settings: **aliens on/off** (default on) and **max aliens** from 0 to 8 (default 4). Ranked arenas always use the default (§5.4.2).
+- Arena settings: **aliens on/off** (default on) and **max aliens** from 0 to 8 (default by arena size: 2 / 3 / 4, §4.1). Ranked arenas always use the default for Small, which is 2 (§5.4.2).
 - **At round start:** `max aliens` aliens spawn on random empty tiles that are at least **6 tiles (Manhattan distance)** away from every player spawn. If there are not enough empty tiles, the generator clears soft walls to make room.
 - **Respawn:** every **30 s** [1800 ticks], if fewer than `max aliens` are alive, one new alien spawns on a random empty tile at least **5 tiles from every living player**.
 - **Spawn warning:** a portal glows on the spawn tile for 1.5 s [90 ticks] before the alien appears. During that time the tile is harmless and the alien cannot be hurt.
 - **Type mix:** Drifter 50 %, Seeker 35 %, Brute 15 %.
 - All alien choices use the round's **seeded PRNG**, so a round replays identically from its seed plus the recorded inputs.
 
-### 4.8 Rounds & match lifecycle (best-of-3)
+### 4.8 Rounds & match lifecycle
 
 #### 4.8.1 States
 
 ```
-WAITING ─(≥2 players & all ready, or host starts)─► COUNTDOWN (3 s) ─► PLAYING
-   ▲                                                    ▲                 │ (≤1 alive or time over)
-   │                                                    │ match open      ▼
-   └──── MATCH_END (12 s) ◄── match decided ─────── ROUND_END (5 s) ──────┘
+WAITING ─(≥2 players, all ready)─► READY_COUNTDOWN (15 s) ─► COUNTDOWN (3 s) ─► PLAYING
+   ▲        ▲                          │ someone joins,                ▲               │ (≤1 alive or time over)
+   │        └──────────────────────────┘ un-readies or leaves          │ match open    ▼
+   │                                                                   │ (Ranked only)
+   └──── MATCH_END (12 s) ◄──────────── match decided ──────────── ROUND_END (5 s) ────┘
+                  ▲                                                                    │
+                  └──────────────── Unrated: round over, skip ROUND_END ───────────────┘
 ```
 
-- **WAITING:** between matches. Players can join, leave, ready up, and the host can change settings (Unrated only).
-- **COUNTDOWN → PLAYING → ROUND_END:** one round. A new random map is generated for every round.
-- **ROUND_END** (5 s): shows the round winner and the current score, then the next round's COUNTDOWN starts automatically.
+- **WAITING:** between matches. Players can join, leave and ready up, and the host can change settings (Unrated only).
+- **READY_COUNTDOWN** (15 s): starts as soon as at least 2 players are in and **all** of them are Ready (§5.2). It is the last chance for more players to join, and it pauses whenever someone is not ready.
+- **COUNTDOWN → PLAYING:** one round. A new random map is generated for every round.
+- **ROUND_END** (5 s, **Ranked only**): shows the round winner and the series score. If the match is still open, the next round's COUNTDOWN starts automatically; otherwise MATCH_END follows.
+- **Unrated** has a single round, so PLAYING goes **straight to MATCH_END** and there is no ROUND_END state. The server still sends `round.end` (with `matchDecided: true`) right before `match.end`, so clients handle both modes the same way.
 - **MATCH_END** (12 s): shows the final standings and rating changes, then the arena goes back to WAITING. Players stay unless they leave.
-- A full best-of-3 lasts at most about **10 min**: 3 × (3 s + 3 min + 5 s) + 12 s.
+- A ranked best-of-3 lasts at most about **10 min**: 3 × (3 s + 3 min + 5 s) + 12 s. An unrated match lasts at most about **3.5 min**.
 
 #### 4.8.2 A round
 
-- **Players per arena:** 2–4. Bigger arenas are out of scope for now.
+- **Players per arena:** **Ranked: exactly 2.** **Unrated: 2–4.** Bigger arenas are out of scope for now.
 - **Time limit:** 3 min.
 - **Sudden death** starts at **2:00**:
-  - Hard walls start filling the arena in a spiral from the border inward, one tile every 0.5 s. That is 120 tiles by 3:00.
+  - Hard walls start filling the arena in a spiral from the border inward. The speed depends on the arena size (§4.1) so that every size loses the same share of its area: one tile every 0.5 s on Large (120 tiles by 3:00), 0.65 s on Medium (≈ 92 tiles), 0.75 s on Small (80 tiles).
   - A player under a falling wall is eliminated. An alien under one dies **without** dropping anything.
   - The HUD shows a sudden-death warning 10 s before it starts.
 - **Round result** (aliens do not count; they cannot win):
@@ -306,32 +335,29 @@ WAITING ─(≥2 players & all ready, or host starts)─► COUNTDOWN (3 s) ─�
   - Players eliminated on the same tick **share** a placement.
 - **Round points:** 1st place = **3**, 2nd = **2**, 3rd = **1**, 4th = **0**. Players who share a placement all get the points of that placement, so two players sharing 1st both get 3.
 
-#### 4.8.3 The match (best-of-3)
+#### 4.8.3 The match
 
-| Rule | Value |
-|---|---|
-| Format | **Ranked:** always best-of-3. **Unrated:** host picks Bo1 / **Bo3** (default) / Bo5. |
-| Win the match | Be the first to **2 round wins** (generally ⌈N/2⌉ for best-of-N) |
-| Maximum rounds | **3** (N). Drawn rounds count as played but give nobody a round win. |
-| Match ends when | Someone reaches 2 round wins, **or** 3 rounds have been played, **or** fewer than 2 players are still in the match |
+| Rule | Ranked (1-vs-1) | Unrated (2–4 players) |
+|---|---|---|
+| Format | **Best-of-3**, fixed | **Single round** (Bo1), fixed |
+| Win the match | Be the first to **2 round wins** | Win the round |
+| Maximum rounds | **3**. Drawn rounds count as played but give nobody a round win. | 1 |
+| Match ends when | Someone reaches 2 round wins, **or** 3 rounds have been played, **or** a player forfeits | After the round, **or** when fewer than 2 players are still in |
 
-**Match placement** (used for the final standings and for ELO). Players are sorted by:
+Why the split: with 3–4 players, a series of rounds can end with everyone holding one win, and then the winner is picked by tiebreaks nobody follows. One round is simple and readable. A duel has no such problem, and best-of-3 there removes the luck of a single round, which matters when rating is at stake.
+
+**Unrated placement** is simply the round placement (§4.8.2).
+
+**Ranked placement** (used for the final result and for ELO). The two players are compared by:
 
 1. **Round wins**, more is better.
 2. **Total round points**, more is better.
 3. **Placement in the last round played**, better is better.
-4. If still equal, the players **share** the match placement. If they share 1st place, the match is a **draw**.
+4. If still equal, the match is a **draw**.
 
-**Example:** 3 players where everyone wins one round.
+Tiebreaks 2–3 only matter when drawn rounds leave the score level, e.g. 1–1 after one drawn round.
 
-| Round | Order | Points A / B / C |
-|---|---|---|
-| 1 | A, B, C | 3 / 2 / 1 |
-| 2 | B, C, A | 1 / 3 / 2 |
-| 3 | C, A, B | 2 / 1 / 3 |
-| **Total** | 1 round win each | **6 / 6 / 6** |
-
-Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
+**Example:** A wins round 1, round 2 is a draw, B wins round 3. That is 1–1 in wins and 8–8 in points (A: 3 + 3 + 2, B: 2 + 3 + 3), so the last round decides it: **B wins the match**.
 
 #### 4.8.4 Joining, leaving and disconnecting
 
@@ -339,10 +365,35 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 - **Disconnect during PLAYING:** the character stays in game (idle) for **15 s**, waiting for a reconnect. An idle character can still be killed. After 15 s the player is eliminated, and their elimination tick is the moment the grace period ran out.
 - **Disconnect between rounds:** a player who is not back by the end of the next COUNTDOWN is eliminated at tick 0 of that round, which puts them last. They can rejoin in later rounds of the same match.
 - **Leaving voluntarily** (ESC → Leave) is a **forfeit**:
-  - The player is eliminated immediately in the current round and placed last in every remaining round.
-  - In the match placement, forfeiting players rank **below everyone who stayed**. Among several forfeiters, whoever left later ranks higher.
+  - The player is eliminated immediately, at the current tick.
+  - **Ranked:** the forfeiter **loses the match** right away (§4.8.3), whatever the round score was, and the opponent wins it.
+  - **Unrated:** the forfeiter ranks **below everyone who stayed**. Among several forfeiters, whoever left later ranks higher.
   - So rage-quitting never improves a result.
 - If only **one** player who has not forfeited is left, the match ends immediately and that player wins it.
+
+### 4.9 Solo mode (one player against the aliens)
+
+Solo mode gives a player something to do when few people are online, and a place to practice. It reuses the round simulation unchanged: the same map, bombs, collectibles, aliens, time limit and sudden death. Only the start, the end condition and the result differ.
+
+| Rule | Solo |
+|---|---|
+| Players | Exactly **1**, guest or registered |
+| Format | **Single round** (a *run*), never rated |
+| Arena | **Small 15×15**, the player spawns at P1 (1, 1). 65 % walls, 30 % wall drops. |
+| Aliens | Always on. The **difficulty** sets max aliens: **Easy 2**, **Normal 4** (default), **Hard 6**. Spawning, respawning (every 30 s up to the cap) and the type mix follow §4.7.3. |
+| Time | 3 min limit, sudden death at 2:00 (§4.8.2) |
+| **Win** | The player is **alive at 3:00** ("survived") |
+| **Loss** | The player is eliminated: alien contact, their own bomb, a sudden-death wall, the 15 s disconnect grace running out, or leaving |
+| **Score** | **Aliens killed** in the run (a Brute counts once). Shown on the result screen, next to the personal best for registered players. |
+
+- **Starting:** *Play solo* is offered on the landing page and in the lobby. The server creates a solo arena for that player and goes **straight to the 3 s COUNTDOWN**. There is no waiting room and no ready countdown (which needs 2 players, §5.2).
+- **The arena is the player's own:** it is private, is not shown in the lobby list, has no invite code and cannot be joined or spectated.
+- **Round end:** the PvP rule "the round ends when at most one player is alive" does not apply, because it would end the run on the first tick. A solo round ends only when the player is eliminated or the time limit is reached.
+- **Lifecycle:** COUNTDOWN → PLAYING → MATCH_END. The server sends `round.end` and `match.end` as in Unrated, so the client handles all modes the same way. The result screen offers **Play again** (a new run on a new map, immediately) and **Back to lobby**. The arena is destroyed when the player leaves it.
+- **One arena at a time** (§5.2) still holds: joining another arena ends a running solo run as a loss.
+- **Never rated.** Solo runs never change ELO.
+- **Persistence:** a registered player's runs appear in their match history, and the profile shows their solo runs, wins and **best score**. Solo runs do **not** count in the PvP statistics (matches played, wins, kills, deaths). Guests' runs are not stored.
+- *(v1.1 candidates: keep playing solo while waiting for an opponent to join your arena, a solo leaderboard, score weights per alien type, endless waves.)*
 
 ---
 
@@ -350,20 +401,34 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 
 ### 5.1 Lobby
 
-- Shows the list of arenas with: name, **Ranked/Unrated** badge, format (Bo3…), status (Waiting / **Round 2 of 3, score 1–0** / Match end), players `n/4`, **average rating** (ranked arenas), whether it is private, whether aliens are on, **region and measured ping**.
+- Shows the list of arenas with: name, **Ranked 1v1 / Unrated** badge, status (Waiting / Starting in 0:12 / **Round 2 of 3, score 1–0** / Playing / Match end), players (`n/2` ranked, `n/4` unrated), the **waiting opponent's rating** (ranked arenas), whether it is private, whether aliens are on, **region and measured ping**.
 - Actions:
-  - **Quick Play:** joins a **ranked** WAITING public arena in the **lowest-ping region**. Among those, it prefers arenas whose average rating is within ±200 of the player's rating, then the fullest arena. If none is available, it creates a new ranked arena. Guests are matched by fullness only.
+  - **Play solo:** starts a solo run against the aliens right away (§4.9), with a difficulty choice (Easy / Normal / Hard). When the arena list is empty, the lobby points to it: "Nobody is waiting right now. Play solo?"
+  - **Quick Play:**
+    - **Registered users** join a **ranked** WAITING arena with one player waiting, in the **lowest-ping region**, preferring an opponent within ±200 rating. If none is available, it creates a new ranked arena and waits there.
+    - **Guests** join an **unrated** WAITING public arena in the lowest-ping region, preferring the fullest one, or create one.
   - **Create Arena:**
-    - Name, region (lowest ping preselected), max players (2–4), private (yes/no).
+    - Name, region (lowest ping preselected), private (yes/no).
     - **Game mode:** **Ranked** or **Unrated**.
-    - Unrated only: format (Bo1/Bo3/Bo5), soft wall density, wall drop rate, aliens on/off, max aliens.
-    - Ranked uses the locked standard rules (§5.4.2).
-  - **Join**: by clicking an arena in the list, or by entering a **6-character invite code** for a private arena.
+    - **Ranked:** always 2 players on a Small arena, public and the locked standard rules (§5.4.2). Not offered to guests.
+    - **Unrated:** max players (2–4), **arena size** (Small 15 / Medium 17 / Large 21, defaulting to the max players, §4.1), soft wall density, wall drop rate, aliens on/off, max aliens. Always a single round.
+  - **Join**: by clicking an arena in the list, or by entering a **6-character invite code** for a private arena. Guests clicking a Ranked arena get a "Register to play Ranked" prompt.
 - The list refreshes live over the socket.
 
 ### 5.2 Arena rules
 
-- The creator is the **host** and can start the match early once at least 2 players are in, and can kick players. In ranked arenas a kick only takes effect between matches. If the host leaves, the host role passes to the player who joined next earliest.
+- The creator is the **host**. The host can change settings (Unrated) and kick players, but **cannot start the match by hand**. In ranked arenas a kick only takes effect between matches. If the host leaves, the host role passes to the player who joined next earliest.
+- **Starting a match: the 15 s ready countdown.**
+  - Every player in the waiting room has a **Ready** toggle.
+  - When at least **2 players** are in and **all** of them are Ready, a **15 s countdown** starts (READY_COUNTDOWN, §4.8.1), visible to everyone in the room and as "Starting in 0:12" in the lobby list.
+  - The arena stays open during the countdown, so a 3rd or 4th player can still join an unrated arena.
+  - **A new player joins** → the countdown **pauses**. The newcomer starts as *Not ready*. When they press Ready, the countdown **restarts from 15 s**.
+  - **A player un-readies** → the countdown pauses until they are Ready again, then restarts from 15 s.
+  - **A player leaves** → if at least 2 players remain and all are Ready, the countdown restarts from 15 s; otherwise it is cancelled.
+  - The host changing a setting un-readies everyone, so nobody starts a match with rules they did not see.
+  - When the countdown reaches 0, the roster is locked and the round's 3 s COUNTDOWN begins.
+  - **Ranked:** the same rule with 2 slots. Once both players are Ready, the 15 s countdown runs, and nobody else can join a full ranked arena.
+  - Restarting from 15 s every time could stall a room if people keep joining. This is accepted: the room is capped at 4 players, so at most 2 restarts can come from new joiners.
 - An arena with no players for 60 s is destroyed.
 - A player can be in **only one arena at a time**. Opening a second tab replaces the first connection.
 
@@ -384,7 +449,8 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 | High rating (≥ 1800) | K = **16** |
 | Leaderboard eligibility | ≥ **10** rated matches. Before that, the player shows as "Placement n/10". |
 | Storage | Integer rating. Deltas are rounded half away from zero. |
-| Unit | **One rating update per match** (the whole best-of-3), never per round |
+| Unit | **One rating update per ranked match** (the whole best-of-3), never per round |
+| Who is rated | Only **Ranked 1-vs-1** matches. Unrated matches, whatever the player count, and Solo runs never change rating. |
 | Seasons | **None in v1.** The rating is permanent, and there are no resets or decay. |
 
 #### 5.4.2 When is a match rated?
@@ -392,48 +458,34 @@ Wins and points are tied, so the 3rd round decides it: **C 1st, A 2nd, B 3rd**.
 A match is **rated** only if **all** of these hold:
 
 1. The arena is **public** and in **Ranked** mode. Private arenas can only be Unrated, which stops friends from boosting each other.
-2. The arena uses the **standard ruleset**, which is locked in Ranked mode: best-of-3, 65 % walls, 30 % wall drops, aliens on, max 4 aliens.
-3. At least **2 registered players** were on the roster when the first round's COUNTDOWN started.
-4. The match reached a result (§4.8.3). A match that ended early because opponents forfeited **is** rated, and the forfeiters lose.
+2. The arena uses the **standard ruleset**, which is locked in Ranked mode: 2 players, best-of-3, Small 15×15 arena, 65 % walls, 30 % wall drops, aliens on, max 2 aliens.
+3. **Both** players on the roster are registered. Guests cannot join Ranked arenas (§3.4), so this always holds; the rating worker still checks it.
+4. The match reached a result (§4.8.3). A match that ended early because the opponent forfeited **is** rated, and the forfeiter loses.
 5. The match finished normally. If a server crashes mid-match, the whole match, including rounds already played, is not rated (see [Events §9](./EVENTS-AND-MESSAGING.md#9-failure-scenarios)).
 
-**Guests** may join Ranked arenas and play normally, but they are never rated and are left out of every ELO pair.
+#### 5.4.3 Two-player ELO
 
-#### 5.4.3 Multiplayer ELO (pairwise method)
-
-A 2–4 player match is treated as **every pair of registered players playing one game against each other**, scored by their **match placement** (§4.8.3), not by individual rounds. Guests are left out of every pair.
-
-For registered players *i* and *j*:
+Standard ELO for player *A* against opponent *B*, scored by the **match** result (§4.8.3), not by individual rounds:
 
 ```
-E_ij  = 1 / (1 + 10^((R_j − R_i) / 400))          expected score of i vs j
-S_ij  = 1    if placement_i better than placement_j
-        0.5  if same placement (tie / draw / simultaneous death)
-        0    if worse
-Δ_i   = round( K_i / (N − 1) × Σ_j (S_ij − E_ij) )   N = number of rated players
-R_i'  = max(100, R_i + Δ_i)
+E_A  = 1 / (1 + 10^((R_B − R_A) / 400))     expected score of A
+S_A  = 1    A won the match
+       0.5  draw
+       0    A lost (including by forfeit)
+Δ_A  = round( K_A × (S_A − E_A) )
+R_A' = max(100, R_A + Δ_A)
 ```
 
-- **Placement** is the match placement: round wins, then round points, then the last round (§4.8.3).
 - **How a player died does not matter.** A death to a bomb, an alien or a wall all count the same. Kills and alien kills do **not** change the rating directly; they only appear in stats.
-- **Forfeiting** puts the player below everyone who stayed, so rage-quitting is never better than losing.
-- Each player uses their **own K**. The sum of all deltas is therefore not exactly zero, which is standard and accepted.
+- **Forfeiting** is a loss, so rage-quitting is never better than playing on.
+- Each player uses their **own K**. Two players with different K values do not move by the same amount, so the sum of both deltas is not always zero. This is standard and accepted.
 
-**Example** (K = 24, 4 rated players):
-
-| Player | Rating | Placement |
-|---|---|---|
-| A | 1200 | 1 |
-| B | 1200 | 2 |
-| C | 1300 | 3 |
-| D | 1100 | 4 |
-
-For A:
+**Example:** A (1200, K = 24) beats B (1300, K = 40, provisional).
 
 ```
-E_AB = 0.50, E_AC = 0.36, E_AD = 0.64  →  ΣE = 1.50
-ΣS = 3
-Δ_A = 24/3 × (3 − 1.50) = +12  →  1212
+E_A = 1 / (1 + 10^(100/400)) = 0.36      E_B = 0.64
+Δ_A = round(24 × (1 − 0.36)) = +15  →  1215
+Δ_B = round(40 × (0 − 0.64)) = −26  →  1274
 ```
 
 #### 5.4.4 Tiers (display only)
@@ -450,69 +502,88 @@ E_AB = 0.50, E_AC = 0.36, E_AD = 0.64  →  ΣE = 1.50
 
 - Ratings are calculated **asynchronously** by the **rating worker**, from the durable `match.finished` domain event (see [Events & Messaging](./EVENTS-AND-MESSAGING.md)).
 - Processing is idempotent, so a duplicate delivery never applies a rating change twice.
-- The game server publishes **one** `match.finished` event per best-of-3 match, containing all of its rounds.
+- The game server publishes **one** `match.finished` event per match (ranked best-of-3 or unrated single round), containing all of its rounds. The rating worker applies ELO only to rated ranked matches.
 - The match-end screen shows "rating updating…" and then the delta, pushed to the client within ~1–2 s.
-- *(v1.1)* Anti-farming: K is halved for a player's 6th+ match within 24 h against the exact same set of registered opponents.
+- *(v1.1)* Anti-farming: K is halved for a player's 6th+ match within 24 h against the same opponent.
 
 ---
 
 ## 6. System Architecture (summary)
 
+v1 runs everything on **one Compute Engine VM** with Docker Compose (§8). Only Pub/Sub, Cloud Storage and the logging/tracing back ends are managed services.
+
 ```
-            ┌───────────────────────────┐
- Browser ──►│ Cloud CDN + Cloud Storage │  (Vue SPA static files)
-   │        └───────────────────────────┘
-   │ HTTPS (REST)              WSS / WebTransport (game)
-   ▼                            ▼
-┌───────────────────┐   ┌──────────────────────────────┐
-│ API service (Go)  │   │ Game servers (Go)            │
-│ Cloud Run         │   │ lobby, arenas, tick loops    │
-│ auth, profiles,   │   └───┬──────────────▲───────────┘
-│ leaderboard       │       │ publish      │ LISTEN rating_updated
-└───┬───────────────┘       │ match.finished
-    │ outbox                ▼              │
-    │               ┌────────────────┐     │
-    └──────────────►│ Cloud Pub/Sub  │     │
-                    │ (domain events)│     │
-                    └───────┬────────┘     │
-                            │ push         │
-                            ▼              │
-                    ┌────────────────┐     │
-                    │ Rating worker  │─────┤
-                    │ (Go, Cloud Run)│     │
-                    └───────┬────────┘     │
-                            ▼              │
-                    ┌──────────────────────┴┐
-                    │ Cloud SQL PostgreSQL  │
-                    └───────────────────────┘
+ Browser
+   │ HTTPS: SPA files, /api/auth/* (Gin), gRPC-Web            WSS /play (game)
+   ▼                                                            │
+┌──────────────────────── GCE VM (europe-west3), docker compose ┼──────────────────────┐
+│ ┌──────────────────────────────┐                              │                      │
+│ │ Caddy: TLS, static Vue SPA,  │──────────────────────────────┘                      │
+│ │ routing                      │──── gRPC-Web ───► Envoy ── gRPC ──┐                  │
+│ └──────┬───────────────────────┘                                   ▼                  │
+│        │ HTTP (Gin)                ┌───────────────────────────────────┐              │
+│        └──────────────────────────►│ API service (Go): Gin + gRPC      │              │
+│                                    │ auth, profiles, leaderboard       │              │
+│                                    └──────────────┬────────────────────┘              │
+│ ┌──────────────────────────────┐                  │                                   │
+│ │ Game server (Go)             │                  │                                   │
+│ │ lobby, arenas, tick loops    │◄── LISTEN rating_updated ──┐                          │
+│ └──────┬───────────────────────┘                  ▼         │                          │
+│        │ publish match.finished        ┌──────────────────────┐                        │
+│        │                               │ PostgreSQL 17        │                        │
+│        │      ┌──────────────────┐     └──────────▲───────────┘                        │
+│        │      │ Rating worker    │────────────────┘                                    │
+│        │      │ (Go, pull)       │                                                     │
+│        │      └────────▲─────────┘     OTel Collector · Prometheus · Grafana           │
+└────────┼───────────────┼─────────────────────────────────────────────────────────────┘
+         ▼               │ pull
+     ┌─────────────────────────┐        Cloud Trace · Cloud Logging · Sentry (errors)
+     │ Cloud Pub/Sub           │
+     │ match-events (+ DLQ)    │
+     └─────────────────────────┘
 ```
 
 | Part | Summary | Details |
 |---|---|---|
-| **Backend** | **Go 1.25+**. A stateless **API service**, a stateful **game server** (one goroutine per arena, **60 Hz** simulation, **30 Hz** snapshots) and a **rating worker** that consumes domain events. | [Server & Network §3](./SERVER-AND-NETWORK.md#3-game-server-internals) |
+| **Backend** | **Go 1.25+**. A stateless **API service** (Gin for HTTP, gRPC for the data APIs), a stateful **game server** (one goroutine per arena, **60 Hz** simulation, **30 Hz** snapshots) and a **rating worker** that consumes domain events. | [Server & Network §3](./SERVER-AND-NETWORK.md#3-game-server-internals), [Backend Architecture](./BACKEND-ARCHITECTURE.md) |
 | **Events** | In-game events go over the socket in real time and never through a queue. **Pub/Sub** carries durable domain events (`match.finished`). Postgres `LISTEN/NOTIFY` delivers rating-update notifications. | [Events & Messaging](./EVENTS-AND-MESSAGING.md) |
-| **Network** | **Binary protocol** over WebSocket in v1. WebTransport datagrams are planned for v2. The client predicts its own movement and bombs, and draws other entities from an interpolation buffer. Players are routed to the nearest region. | [Server & Network §4–§7](./SERVER-AND-NETWORK.md#4-transport) |
-| **Database** | **PostgreSQL 17** on Cloud SQL | §7 |
-| **Frontend** | **Vue 3 + TypeScript + Vite + Pinia**. Vue handles the menus and HUD. A non-reactive game engine draws the game on a Canvas 2D at 60 FPS. | [GUI Plan](./GUI-PLAN.md) |
+| **Network** | **Binary protocol** over WebSocket in v1. WebTransport datagrams are planned for v2. The client predicts its own movement and bombs, and draws other entities from an interpolation buffer. v1 serves one region; v2 routes players to the nearest one. | [Server & Network §4–§7](./SERVER-AND-NETWORK.md#4-transport) |
+| **Database** | **PostgreSQL 17** in a container on the VM's persistent disk (v1), Cloud SQL in v2 | §7 |
+| **Frontend** | **Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind**. Vue handles the menus and HUD. A non-reactive game engine draws the game on a Canvas 2D at 60 FPS. Data calls use generated **gRPC-Web** clients. | [GUI Plan](./GUI-PLAN.md) |
+| **Operations** | **GitHub Actions** CI/CD, **OpenTelemetry** traces, **Prometheus + Grafana** metrics, **Sentry** errors | [CI/CD](./CI-CD.md) |
 
-### 6.1 REST API (API service)
+### 6.1 API (API service)
+
+The API has two faces:
+
+- **HTTP via Gin**, for the few endpoints that need browser-native HTTP: the auth endpoints set and read the `HttpOnly` refresh cookie, and health checks and the ping endpoint must be plain HTTP.
+- **gRPC services** for all data APIs. They are defined in `/protocol/api/bomberman/v1/*.proto` and managed with **buf** (lint, breaking-change check, code generation for Go and TypeScript). The browser calls them with **gRPC-Web**, and **Envoy** translates gRPC-Web to gRPC.
+
+**HTTP (Gin):**
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/auth/register` | – | Create account → tokens |
-| POST | `/api/auth/login` | – | Login → tokens |
+| POST | `/api/auth/register` | – | Create account → access token + refresh cookie |
+| POST | `/api/auth/login` | – | Login → access token + refresh cookie |
 | POST | `/api/auth/guest` | – | `{nickname?}` → guest token |
-| POST | `/api/auth/refresh` | cookie | New access token |
+| POST | `/api/auth/refresh` | cookie | New access token (rotates the refresh cookie) |
 | POST | `/api/auth/logout` | user | Revoke refresh token |
-| GET | `/api/me` | user/guest | Current identity + rating (users) |
-| GET | `/api/regions` | – | Game regions + ping endpoints |
-| GET | `/api/leaderboard?offset&limit` | – | Top players by rating (eligible only) |
-| GET | `/api/users/:username` | – | Public profile, stats, rating, tier, rank |
-| GET | `/api/users/:username/matches` | – | Paginated match history (with rating deltas) |
-| GET | `/api/users/:username/rating-history` | – | Rating over time (for the chart) |
+| HEAD | `/ping` | – | Latency probe for region selection |
 | GET | `/healthz`, `/readyz` | – | Health checks |
+| GET | `/metrics` | internal only | Prometheus scrape endpoint, not routed by Caddy |
 
-The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETWORK.md#5-binary-protocol).
+**gRPC (package `bomberman.v1`, JWT in the `authorization` metadata):**
+
+| Service | RPC | Auth | Purpose |
+|---|---|---|---|
+| `AccountService` | `GetMe` | user/guest | Current identity + rating (users) |
+| `RegionService` | `ListRegions` | – | Game regions + ping and socket URLs |
+| `LeaderboardService` | `ListLeaderboard(offset, limit)` | – | Top players by rating (eligible only) |
+| `ProfileService` | `GetProfile(username)` | – | Public profile, stats (incl. solo runs, wins and best score), rating, tier, rank |
+| | `ListMatches(username, cursor, limit)` | – | Paginated match history (with rating deltas) |
+| | `GetRatingHistory(username)` | – | Rating over time (for the chart) |
+
+Domain errors map to gRPC status codes (`NotFound`, `InvalidArgument`, `AlreadyExists`, `Unauthenticated`), not HTTP statuses. The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETWORK.md#5-binary-protocol); they stay on the WebSocket, because gRPC is not suited to 60 Hz game traffic in the browser.
 
 ### 6.2 Technology rationale
 
@@ -520,10 +591,10 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 
 **Why Go fits this game:**
 
-- The server only runs game rules: a 21×21 grid, ≤ 4 players, a few aliens, tile-by-tile integer movement. No engine, physics or rendering is needed on the server.
+- The server only runs game rules: a grid of at most 21×21, ≤ 4 players, a few aliens, tile-by-tile integer movement. No engine, physics or rendering is needed on the server.
 - The workload is many small concurrent arenas and many WebSocket connections. One goroutine per arena plus two per connection is cheap, and the language handles this well.
 - Garbage collection pauses are typically well under 1 ms. The simulation makes 0 allocations per tick ([Server & Network §3.2](./SERVER-AND-NETWORK.md#32-the-simulation-package-internalgame)), and one tick is 16.7 ms, so GC is far below network jitter.
-- Small static binaries start fast on Cloud Run, and one language covers the API, game server, worker and bots.
+- Small static binaries make small container images, and one language covers the API, game server, worker and bots.
 - Go is proven for game backends: Nakama and Agones are both written in Go.
 
 **The real cost, and how it is handled:** client-side prediction needs part of the rules in the browser, so that part exists in two languages. The options:
@@ -533,7 +604,7 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 | **A. Go server + TS port of the predicted rules + generated test vectors** | Kept in sync by CI | **Chosen.** Tile-by-tile movement keeps the port to roughly 300 lines. Explosions, damage, pickups and aliens are never predicted. |
 | B. Compile `internal/game` to WebAssembly for the client | One codebase | Rejected for v1: adds roughly 0.5–1 MB gzipped (less with TinyGo) and JS↔WASM friction, for a port that is small anyway. It stays possible later because the simulation is pure. |
 | C. TypeScript/Node server with **Colyseus** | Native | Rejected. Its main gains are room handling and delta state sync. We need room logic of our own anyway (best-of-3, ranked rules), and full snapshots are only about 120 B, so delta sync saves almost nothing. Colyseus also does not provide prediction or interpolation, which we would write either way. |
-| D. **Nakama** (Go game backend with authoritative matches, auth, leaderboards) | Go match handlers | Rejected for v1: it replaces our own accounts, ELO and schema design with its model. The open-source edition runs as a single node (clustering is commercial), Go plugins must be built against the exact Nakama version, and it is stateful, so it does not fit Cloud Run. Worth revisiting only if the custom networking becomes a burden. |
+| D. **Nakama** (Go game backend with authoritative matches, auth, leaderboards) | Go match handlers | Rejected for v1: it replaces our own accounts, ELO and schema design with its model. The open-source edition runs as a single node (clustering is commercial), and Go plugins must be built against the exact Nakama version. Worth revisiting only if the custom networking becomes a burden. |
 | E. Rust | WASM-shareable | Rejected: much higher effort for no benefit at this scale. |
 
 **Networking effort:** we write the networking ourselves, on top of `coder/websocket`. The parts and their rough size are listed in [Server & Network §3.6](./SERVER-AND-NETWORK.md#36-networking-code-build-vs-buy).
@@ -542,137 +613,21 @@ The real-time messages are specified in [Server & Network §5](./SERVER-AND-NETW
 
 ## 7. Data Model (PostgreSQL)
 
-- **Engine:** Cloud SQL for **PostgreSQL 17**. Prod runs in HA (regional) mode with automated backups and 7-day point-in-time recovery, on a private IP.
-- **Access:** IAM database authentication through the Cloud SQL Go connector and `pgxpool`.
+- **Engine:** **PostgreSQL 17**. In v1 it is the `postgres:17` container on the VM, with its data on a separate persistent disk, a nightly `pg_dump` to Cloud Storage and daily disk snapshots ([CI-CD §6.3](./CI-CD.md#63-backups)). In v2 it moves to Cloud SQL (HA, point-in-time recovery).
+- **Access:** `pgxpool` over the internal Docker network. Each service logs in with its own role and password (from Secret Manager), so table ownership is enforced by the database ([DATABASE §7](./DATABASE.md#7-roles-and-privileges)).
 - **Extensions:** `citext`.
 - **IDs:** **UUIDv7**, generated in the application. They sort by time, which keeps the indexes compact.
-- **Migrations:** `golang-migrate`, run as a Cloud Run job before each deploy.
+- **Migrations:** **Goose** SQL files, applied by the one-shot `migrate` container before each deploy.
 - **Timeouts:** `statement_timeout = 5s` for API connections.
 
-```sql
-CREATE TABLE users (
-  id             UUID PRIMARY KEY,
-  username       CITEXT UNIQUE NOT NULL,
-  email          CITEXT UNIQUE NOT NULL,
-  password_hash  TEXT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_login_at  TIMESTAMPTZ
-);
+The full schema (every table, column, constraint, foreign key and index, plus the Go type mapping and migration plan) is in **[DATABASE.md](./DATABASE.md)**, which is the source of truth. Summary:
 
-CREATE TABLE refresh_tokens (
-  id          UUID PRIMARY KEY,
-  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token_hash  TEXT NOT NULL,
-  expires_at  TIMESTAMPTZ NOT NULL,
-  revoked_at  TIMESTAMPTZ
-);
-CREATE INDEX ON refresh_tokens (user_id);
-
-CREATE TABLE player_ratings (
-  user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  rating         INT  NOT NULL DEFAULT 1200 CHECK (rating >= 100),
-  peak_rating    INT  NOT NULL DEFAULT 1200,
-  rated_matches  INT  NOT NULL DEFAULT 0,
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
--- leaderboard: only players past placement
-CREATE INDEX player_ratings_leaderboard
-  ON player_ratings (rating DESC, user_id) WHERE rated_matches >= 10;
-
-CREATE TABLE matches (
-  id            UUID PRIMARY KEY,           -- = matchId from the game server
-  arena_name    TEXT,
-  region        TEXT NOT NULL,
-  ruleset       TEXT NOT NULL,              -- 'standard' | 'custom'
-  mode          TEXT NOT NULL CHECK (mode IN ('ranked','unrated')),
-  best_of       SMALLINT NOT NULL CHECK (best_of IN (1,3,5)),
-  rounds_played SMALLINT NOT NULL,
-  rated         BOOLEAN NOT NULL,           -- rating actually applied (§5.4.2)
-  started_at    TIMESTAMPTZ NOT NULL,
-  ended_at      TIMESTAMPTZ NOT NULL,
-  duration_ms   INT NOT NULL,
-  result        TEXT NOT NULL CHECK (result IN ('win','draw'))
-);
-CREATE INDEX ON matches (ended_at DESC);
-
-CREATE TABLE match_rounds (                 -- one row per round of the best-of-N
-  match_id      UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  round_no      SMALLINT NOT NULL,          -- 1..best_of
-  seed          BIGINT NOT NULL,
-  started_at    TIMESTAMPTZ NOT NULL,
-  duration_ms   INT NOT NULL,
-  result        TEXT NOT NULL CHECK (result IN ('win','draw')),
-  winner_slot   SMALLINT NULL,
-  end_reason    TEXT NOT NULL CHECK (end_reason IN ('last_standing','timeout_hp','simultaneous')),
-  players       JSONB NOT NULL,             -- [{slot, placement, points, eliminatedTick, deathCause, killerSlot, alienType, kills, ...}]
-  input_log_uri TEXT,                       -- optional GCS replay of this round
-  PRIMARY KEY (match_id, round_no)
-);
-
-CREATE TABLE match_players (
-  match_id         UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  slot             SMALLINT NOT NULL,
-  user_id          UUID NULL REFERENCES users(id) ON DELETE SET NULL,  -- NULL = guest
-  display_name     TEXT NOT NULL,
-  placement        SMALLINT NOT NULL,       -- MATCH placement (§4.8.3); 1 = best; ties share a value
-  round_wins       SMALLINT NOT NULL DEFAULT 0,
-  round_points     SMALLINT NOT NULL DEFAULT 0,
-  forfeited        BOOLEAN  NOT NULL DEFAULT false,
-  -- totals across all rounds of the match (per-round detail lives in match_rounds.players)
-  kills            SMALLINT NOT NULL DEFAULT 0,
-  alien_kills      SMALLINT NOT NULL DEFAULT 0,
-  walls_destroyed  SMALLINT NOT NULL DEFAULT 0,
-  powerups_taken   SMALLINT NOT NULL DEFAULT 0,
-  bombs_placed     SMALLINT NOT NULL DEFAULT 0,
-  rating_before    INT NULL,                -- NULL if unrated
-  rating_after     INT NULL,
-  PRIMARY KEY (match_id, slot)
-);
-CREATE INDEX ON match_players (user_id, match_id);
-
-CREATE TABLE rating_history (
-  user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  match_id       UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-  rating_before  INT NOT NULL,
-  rating_after   INT NOT NULL,
-  delta          INT NOT NULL,
-  k_factor       SMALLINT NOT NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, match_id)
-);
-CREATE INDEX ON rating_history (user_id, created_at DESC);
-
-CREATE TABLE user_stats (                   -- denormalized for fast profile reads
-  user_id        UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  matches_played INT NOT NULL DEFAULT 0,
-  wins           INT NOT NULL DEFAULT 0,     -- matches won
-  rounds_played  INT NOT NULL DEFAULT 0,
-  round_wins     INT NOT NULL DEFAULT 0,
-  forfeits       INT NOT NULL DEFAULT 0,
-  kills          INT NOT NULL DEFAULT 0,
-  alien_kills    INT NOT NULL DEFAULT 0,
-  deaths         INT NOT NULL DEFAULT 0,
-  deaths_by_alien INT NOT NULL DEFAULT 0
-);
-
--- Messaging support (see EVENTS-AND-MESSAGING.md)
-CREATE TABLE processed_events (             -- consumer inbox: idempotency
-  event_id      UUID PRIMARY KEY,
-  event_type    TEXT NOT NULL,
-  processed_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE outbox (                       -- producer outbox (API service)
-  id            UUID PRIMARY KEY,
-  topic         TEXT NOT NULL,
-  event_type    TEXT NOT NULL,
-  payload       JSONB NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  published_at  TIMESTAMPTZ NULL,
-  attempts      INT NOT NULL DEFAULT 0
-);
-CREATE INDEX outbox_unpublished ON outbox (created_at) WHERE published_at IS NULL;
-```
+| Group | Tables |
+|---|---|
+| Accounts | `users`, with 1:1 components `user_credentials`, `player_ratings`, `user_stats`; `refresh_tokens` (rotation families) |
+| Match aggregate | `matches` → `match_players` (per slot), `match_rounds` (per round), `match_round_players` (per round × slot) |
+| Rating | `rating_history` (one row per rated player per rated match) |
+| Messaging | `processed_events` (consumer inbox), `outbox` (API producer) |
 
 - **Leaderboard rank** = `1 + count(*) of eligible players with a higher rating`. This query uses the partial index. Pages of the top 100 are cached in memory for 30 s.
 - A self-kill is not counted as a kill.
@@ -683,41 +638,45 @@ CREATE INDEX outbox_unpublished ON outbox (created_at) WHERE published_at IS NUL
 
 ---
 
-## 8. Deployment on GCP (summary)
+## 8. Deployment (summary)
 
-| Concern | GCP service |
-|---|---|
-| Frontend hosting | **Cloud Storage** + **Cloud CDN** (or Firebase Hosting) |
-| API service | **Cloud Run** (stateless, autoscaled) |
-| Game servers | **v1:** a single Cloud Run instance in one region. **v2:** **GKE Autopilot** in 2–3 regions. |
-| Rating worker | **Cloud Run** service behind a Pub/Sub **push** subscription (OIDC-authenticated) |
-| Message queue | **Cloud Pub/Sub**: topic `match-events` + `match-events-dlq` (v1). `user-events` is added in v1.1. |
-| Analytics (optional) | Pub/Sub → **BigQuery subscription** on `match-events` |
-| Database | **Cloud SQL for PostgreSQL 17** (HA, private IP, primary region) |
-| Arena directory / lobby pub/sub | **Memorystore for Redis** (v2) |
-| Secrets | **Secret Manager** |
-| Images / CI/CD | **Cloud Build** (CI + triggers), **Artifact Registry** (images), **Cloud Deploy** (staging → prod promotion with approval). See [CI-CD.md](./CI-CD.md). |
-| Ingress / TLS / DDoS | **External HTTPS LB** + managed certs + **Cloud Armor**. A passthrough Network LB serves WebTransport in v2. |
-| Observability | **Cloud Logging**, **Cloud Monitoring**, **Cloud Trace** (trace context propagated through events) |
-| Infra as code | **Terraform** |
-| Environments | `dev` (docker compose with Postgres + **Pub/Sub emulator**), `staging`, `prod`, each in its own GCP project, plus a shared `cicd` project for builds and images |
+**v1 is a single server.** One Compute Engine VM runs the whole stack with Docker Compose. That keeps cost, moving parts and operations small while the game finds players. Scaling out (GKE + Helm, Cloud SQL, Redis, several regions) is the v2 step and needs no game-code changes, because transport, publisher and store sit behind interfaces.
 
-The topology, why it was chosen for latency, and the scaling path are covered in [Server & Network §8](./SERVER-AND-NETWORK.md#8-deployment-topology--scaling).
+| Concern | v1 (one VM) | v2 (scale-out) |
+|---|---|---|
+| Host | **Compute Engine VM** `e2-standard-4` in `europe-west3`, Docker Compose | **GKE** with **Helm** charts, 2–3 regions |
+| Ingress / TLS | **Caddy** container (Let's Encrypt, HTTP/2 + HTTP/3), also serves the Vue SPA | GKE Gateway + managed certs + Cloud Armor; passthrough Network LB for game traffic and WebTransport |
+| gRPC-Web | **Envoy** container | Envoy (sidecar or gateway) |
+| API service | One container (Gin + gRPC) | Deployment, autoscaled |
+| Game server | One container, arenas in memory | Game pods per region + gateway (Server & Network §8.2) |
+| Rating worker | One container, Pub/Sub **pull** subscription | Deployment, same code |
+| Message queue | **Cloud Pub/Sub**: topic `match-events` + `match-events-dlq`. `user-events` is added in v1.1. | Same |
+| Analytics | Four layers ([Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics)): **Umami** container (cookieless web analytics, own `umami` database), funnel counters in **Prometheus**, an own event pipeline (Pub/Sub `analytics-events` → **BigQuery**), consent-gated **PostHog EU** heatmaps on demand only. Optionally `match-events` → BigQuery too. | Same |
+| Database | **PostgreSQL 17** container, nightly `pg_dump` → Cloud Storage, disk snapshots | **Cloud SQL for PostgreSQL 17** (HA, PITR) |
+| Arena directory / lobby pub/sub | In-process | **Memorystore for Redis** |
+| Secrets | **Secret Manager**, fetched into a root-only `.env` at deploy time | Secret Manager via the CSI driver / Workload Identity |
+| Images / CI/CD | **GitHub Actions** (CI, release, approval via the `production` environment), **Artifact Registry**. See [CI-CD.md](./CI-CD.md). | GitHub Actions + `helm upgrade` |
+| Observability | **OpenTelemetry** → Cloud Trace, **Prometheus + Grafana** on the VM, **Sentry**, Cloud Logging (Ops Agent), external uptime check | Managed Service for Prometheus, Cloud Monitoring |
+| Infra as code | None: a short `gcloud` runbook ([CI-CD §8](./CI-CD.md#8-bootstrap-steps-one-time)) | Revisited when there are several environments |
+| Environments | `local` (Docker Compose with Postgres + **Pub/Sub emulator**) and `prod` | + `staging` |
+
+The topology, why it was chosen for latency, and the scaling path are covered in [Server & Network §8](./SERVER-AND-NETWORK.md#8-deployment-topology--scaling) and [CI-CD §9](./CI-CD.md#9-path-to-v2-scaling-up).
 
 ### 8.1 Regions (EU only)
 
 | Role | Region |
 |---|---|
-| **Primary** (v1: everything) | **`europe-west3` (Frankfurt)**: central to the EU player base. Hosts Cloud SQL, Pub/Sub worker, API, game server, Artifact Registry. |
+| **Primary** (v1: everything) | **`europe-west3` (Frankfurt)**: central to the EU player base. Hosts the VM (and with it the API, game server, worker and database), Artifact Registry and the Pub/Sub regional endpoint. |
 | v2 extra game regions | **`europe-west1` (Belgium)** for West/UK/Iberia and **`europe-central2` (Warsaw)** for Central/East. `europe-north1` (Finland) can be added for the Nordics if latency data supports it. |
-| Cloud SQL HA standby | Same region (zonal failover). A cross-region read replica / DR copy goes in `europe-west1`. |
+| v2 Cloud SQL HA standby | Same region (zonal failover). A cross-region read replica / DR copy goes in `europe-west1`. |
 
 - **Data residency (GDPR):**
   - Pub/Sub **message storage policy** is restricted to EU regions.
   - The BigQuery dataset location is `EU`.
-  - GCS buckets (replays, Terraform state, static assets origin) are `EU` / `europe-west3`.
-  - Cloud SQL backups are stored in the EU.
-  - An organization policy `gcp.resourceLocations = in:eu-locations` enforces all of this.
+  - Cloud Storage buckets (backups, replays) are `EU` / `europe-west3`, and disk snapshots use an EU storage location.
+  - Sentry is configured with its **EU data region**.
+  - Analytics stays in the EU: Umami runs on the VM, the `analytics` BigQuery dataset is in `EU`, and PostHog (only when switched on, with consent) uses its **EU Cloud**. Privacy rules: [Events §12.5](./EVENTS-AND-MESSAGING.md#125-privacy-rules-all-layers).
+  - The project has no organization in v1, so the `gcp.resourceLocations` org policy can't be set. Every resource is created with an explicit EU location by the runbook ([CI-CD §8](./CI-CD.md#8-bootstrap-steps-one-time)). The org policy is added if the project moves into an organization.
 - **Expected latency:** with Premium Tier, players across the EU typically see about **10–40 ms** RTT to Frankfurt. v2 regions mainly add capacity and resilience and shave the edges, such as the Iberian peninsula and the Baltics.
 
 ---
@@ -726,14 +685,15 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 - **The server is authoritative:** clients send intents only. All movement, collisions, bombs, aliens, damage and pickups are computed on the server. Client-side prediction is cosmetic, and the server corrects it.
 - **Ratings cannot be tampered with:**
-  - Only the game server's service account may publish to `match-events`.
-  - Only the rating worker's service account may write ratings.
-  - Clients never submit results.
+  - Clients never submit results. Only the game server publishes to `match-events`, and the topic is not reachable with any credential a client has.
+  - Only the rating worker's **database role** may write ratings ([DATABASE §7](./DATABASE.md#7-roles-and-privileges)).
+  - In v1 all containers share the VM's service account, so the publish restriction is enforced by code and network layout, not IAM. v2 gives each service its own identity (GKE Workload Identity), and then only the game server's service account may publish.
 - The JWT is validated when the game socket connects. The `Origin` header is checked against an allow-list.
 - Input validation and rate limits apply to REST and to the game socket (at most 90 binary messages/s: 60 commands plus pings). The server consumes exactly one command per player per tick, which makes speed hacks impossible.
 - Usernames and nicknames go through a profanity filter.
-- Only HTTPS/WSS is used. Security headers (CSP, HSTS) are set, and CORS is restricted to the frontend origin.
-- Cloud Armor rate limiting at the load balancer.
+- Only HTTPS/WSS is used. Security headers (CSP, HSTS) are set, and CORS (Caddy and Envoy) is restricted to the frontend origin.
+- Rate limiting happens in the application in v1 (per IP and per account). Cloud Armor at the load balancer comes with v2.
+- The VM exposes only ports 80 and 443. SSH goes through IAP, and Postgres, Prometheus and the internal gRPC/HTTP ports are never published.
 - Passwords are never logged, and PII stays out of logs and events. Events carry user IDs and display names only, never emails.
 
 ---
@@ -743,14 +703,14 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 | Area | Requirement |
 |---|---|
 | Latency | Your own move and bomb show on screen within **one frame** (prediction). Other entities are shown **≈ RTT/2 + 50–80 ms** behind the server. Explosions and other world events appear **≈ RTT/2 + 1 tick** after they happen on the server. In-region RTT target: p50 ≤ 40 ms. Server tick ≤ 1 ms per arena at p99. Full budget: [Server & Network §2](./SERVER-AND-NETWORK.md#2-latency-budget). |
-| Durability | Once a match result is published, it is **never lost**. It survives game server restarts and Cloud SQL outages of up to 7 days (Pub/Sub retention). |
+| Durability | Once a match result is published, it is **never lost**. It survives game server restarts and database outages of up to 7 days (Pub/Sub retention). Accounts and profiles have an RPO of 24 h in v1 (nightly backup + disk snapshots). |
 | Rating correctness | Each rating change is applied **exactly once** (at-least-once delivery + idempotent consumer). p95 time from match end to rating visible ≤ 3 s. |
 | Performance | The client renders at 60 FPS on a mid-range laptop. Bundle size ≤ 300 KB gzipped (without assets). |
-| Availability | 99.5 % monthly (v1). The game keeps running when the database is down; only ratings and profiles are delayed. |
+| Availability | 99 % monthly (v1, one VM: a VM or zone failure takes the whole game down until the VM restarts or is rebuilt from a snapshot). 99.5 % in v2. The game keeps running when the database is down; only ratings and profiles are delayed. |
 | Scalability | ≥ 200 concurrent arenas per 2 vCPU instance. |
 | Browser support | Latest 2 versions of Chrome, Firefox, Edge and Safari. |
-| Observability | Metrics: active arenas/players/aliens, tick duration and jitter, RTT per region, send queue depth, reconnects, Pub/Sub publish latency and oldest unacked message age, DLQ size, rating processing lag. Structured JSON logs (`log/slog`). |
-| Testing | Unit tests for `internal/game` (map gen invariants, blast propagation, chain reactions, pickups and caps, damage/invulnerability, alien AI, instant alien kill, drops, determinism) and `internal/rating` (ELO math, ties, guests, K-factors, eligibility). Idempotency tests for the consumer (duplicate and out-of-order delivery). Shared protocol test vectors for Go and TS. Playwright E2E with 2 clients under simulated latency. |
+| Observability | Metrics (Prometheus, through OpenTelemetry instrumentation): active arenas/players/aliens, tick duration and jitter, RTT per region, send queue depth, reconnects, Pub/Sub publish latency and oldest unacked message age, DLQ size, rating processing lag. Traces with OpenTelemetry. Errors in Sentry. Structured JSON logs (`log/slog`). |
+| Testing | Go tests use the standard `testing` package with **testify** (`require`/`assert`) and **mockery**-generated mocks for service interfaces. Unit tests for `internal/game` (map gen invariants, blast propagation, chain reactions, pickups and caps, damage/invulnerability, alien AI, instant alien kill, drops, determinism) and `internal/rating` (ELO math, ties, guests, K-factors, eligibility). Idempotency tests for the consumer (duplicate and out-of-order delivery). Shared protocol test vectors for Go and TS. Playwright E2E with 2 clients under simulated latency. |
 | Accessibility | Colorblind-safe player colors with name labels, remappable keys (see [GUI Plan](./GUI-PLAN.md#11-accessibility--i18n)). |
 
 ---
@@ -759,20 +719,23 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 1. A visitor can register, log in, log out, or start as a guest in ≤ 2 clicks.
 2. The lobby lists arenas live with region, ping, Ranked/Unrated badge and match progress. A player can quick-play, create (public/private, Ranked/Unrated) and join by code.
-3. Every generated map is 21×21, has hard walls on the border and on every (even, even) tile, has soft walls only on other tiles, and has the 4 spawn safe zones clear.
+3. Every generated map has the arena's size (15×15, 17×17 or 21×21; always 15×15 in Ranked), has hard walls on the border and on every (even, even) tile, has soft walls only on other tiles, and has the spawn safe zones clear. Two players start in opposite corners.
 4. SPACE places a bomb that explodes after 3 s in a + shape limited by range. Fire stops at hard walls, destroys the first soft wall it hits in each direction, and sets off other bombs.
 5. A player starts with 1 bomb. Each **+Bomb** collectible lets them have one more bomb on the field at the same time, up to 8.
 6. Destroyed soft walls sometimes drop +Health, +Fire or +Bomb, and the caps are enforced.
 7. Aliens of all 3 types spawn away from players, move according to their behavior, **kill a player instantly on contact** (including tile swaps, regardless of HP or invulnerability), take damage from fire, respawn every 30 s up to the cap, and **always** drop collectibles when killed (Brute: 2).
 8. A bomb hit removes 1 HP followed by 1.5 s of fire invulnerability, and 0 HP eliminates the player.
 9. The last player alive wins the round. Sudden death starts at 2:00. At the 3:00 time-out, the survivor with the most HP wins, and a tie on the highest HP is a draw. Simultaneous final deaths produce a drawn round. Round placement follows HP for survivors, then elimination order.
-10. A match is best-of-3: the first player to 2 round wins takes it, with at most 3 rounds. Every round has a new map and reset power-ups. Ties are broken by round points, then the last round. Forfeiting players are ranked last.
+10. A ranked match is a 1-vs-1 best-of-3: the first player to 2 round wins takes it, with at most 3 rounds. Every round has a new map and reset power-ups. Ties are broken by round points, then the last round. A forfeit is a loss. An unrated match (2–4 players) is a single round, and its placement is the round placement.
+    - A match starts only through the waiting room's 15 s all-ready countdown. A player joining during it pauses it, and it restarts from 15 s when they are Ready. Guests cannot join Ranked arenas.
+    - On a touch device, a virtual joystick (4 directions) and a bomb button control the player, with the same result as the keyboard.
 11. Several arenas run at the same time without interfering with each other.
 12. With 100 ms of simulated RTT, your own movement and bomb placement still appear instantly, and remote players move smoothly without jitter.
-13. After a rated best-of-3 match, every registered player's rating changes **once** according to §5.4. The delta appears on the match-end screen within 3 s, and on the profile and leaderboard. Unrated matches, private arenas and guests are never rated. There are no seasons or resets.
+13. After a rated ranked match, both players' ratings change **once** according to §5.4. The delta appears on the match-end screen within 3 s, and on the profile and leaderboard. Unrated matches and private arenas are never rated. There are no seasons or resets.
 14. If the same `match.finished` event is delivered twice, the rating changes only once. If the database is down at match end, the rating is applied after it recovers.
 15. Registered users' matches (with per-round detail) show up in their profile. Guests' results do not.
-16. The app is deployed to GCP through CI from `main`.
+16. The app is deployed to the v1 VM by GitHub Actions from `main`, after a manual approval.
+17. A guest or registered player can start a **solo run** in ≤ 2 clicks and plays alone against the aliens on a 15×15 arena. The run does not end while the player is alive before 3:00. Being alive at 3:00 is a win, being eliminated is a loss, and the result screen shows the number of aliens killed. The difficulty sets the alien cap (2 / 4 / 6). Solo arenas are not listed and cannot be joined. Solo runs never change ratings or PvP statistics; a registered player's runs and best score show up in their profile.
 
 ---
 
@@ -780,17 +743,17 @@ The topology, why it was chosen for latency, and the scaling path are covered in
 
 | # | Milestone | Content |
 |---|---|---|
-| M1 | **Core simulation** | `internal/game`: map gen, movement, bombs, fire, collectibles (incl. +Bomb), round result & placement, **best-of-N match logic** (round points, tiebreaks, forfeits), determinism tests |
-| M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, tests |
+| M1 | **Core simulation** | `internal/game`: map gen, movement, bombs, fire, collectibles (incl. +Bomb), round result & placement, **match logic** (ranked best-of-3 with round points, tiebreaks and forfeits; unrated single round), determinism tests |
+| M2 | **Aliens** | Alien types, AI (wander/BFS hunt/danger avoidance), instant contact kill, spawning, guaranteed drops, **solo mode** (§4.9), tests |
 | M3 | **Netcode** | Binary protocol + codecs (Go/TS) with shared test vectors, event sequencing and replay, WS gateway, arena tick loop, prediction and interpolation, latency simulator |
-| M4 | **GUI** | Vue app shell, canvas renderer, HUD, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
-| M5 | **Accounts & data** | Register/login/guest, JWT/refresh, PostgreSQL schema & migrations, profiles & stats |
-| M6 | **Events & ranking** | Pub/Sub topics + DLQs, match publisher with local spool, rating worker (inbox, ELO), `LISTEN/NOTIFY` push, leaderboard, outbox table (relay enabled in v1.1) |
-| M7 | **GCP deployment** | Terraform, Cloud Run, Cloud SQL, Pub/Sub, CDN, CI/CD, monitoring & alerts |
+| M4 | **GUI** | Vue app shell, canvas renderer, HUD, touch controls, lobby, waiting room, results ([GUI Plan](./GUI-PLAN.md)) |
+| M5 | **Accounts & data** | Register/login/guest (Gin), JWT/refresh, PostgreSQL schema & Goose migrations, gRPC services (buf) + Envoy gRPC-Web for profiles & stats |
+| M6 | **Events & ranking** | Pub/Sub topics + DLQs, match publisher with local spool, rating worker (pull, inbox, ELO), `LISTEN/NOTIFY` push, leaderboard, outbox table (relay enabled in v1.1) |
+| M7 | **v1 deployment** | GitHub Actions CI/CD, Artifact Registry, the VM + Docker Compose stack (Caddy, Envoy, Postgres), backups, OpenTelemetry + Prometheus/Grafana + Sentry, alerts |
 | M8 | **Polish** | Sprites, animations, sound, sudden death, settings, accessibility |
-| v2 | **Scale & latency** | Multi-region GKE, Redis directory, WebTransport datagrams |
-| v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, touch controls, anti-farming |
-| Later | Not in v1 | Rating seasons / resets, co-op / PvE modes |
+| v2 | **Scale & latency** | GKE + Helm, Cloud SQL, multi-region game pods, Redis directory, WebTransport datagrams |
+| v1.1+ | Extras | Phantom alien, +Speed/Kick, lobby chat, email verify/reset, anti-farming, ranked matchmaking queue |
+| Later | Not in v1 | Rating seasons / resets, co-op modes |
 
 ---
 
@@ -800,16 +763,23 @@ Defaults are proposed above. Please confirm or change them:
 
 **Resolved:**
 
-- Match format is **best-of-3**.
+- Match format: **Ranked is 1-vs-1 best-of-3**, **Unrated is a single round** (v0.8).
 - There are **no seasons** in v1.
-- There are two game modes: **Ranked** and **Unrated**. Guests may join Ranked arenas but are never rated.
+- There are two game modes: **Ranked** and **Unrated**. Only registered players can play Ranked (v0.8).
+- Ranked opponents are found through ranked arenas in the lobby (and Quick Play), not a matchmaking queue (v0.8).
+- Matches start with a 15 s all-ready countdown; there is no host Start button (v0.8).
+- Touch controls are in v1: a virtual joystick and a bomb button (v0.8).
 
 - Players start with **3 HP**, up to 5 with +Health.
-- **2–4 players** per arena. No bigger arenas for now.
+- **2–4 players** per unrated arena, exactly 2 in ranked. No bigger arenas for now.
 - **Sudden death** stays. At the 3:00 time-out **the player with less HP loses**.
 - Movement is **tile-by-tile**.
 - **EU regions only** (§8.1).
+- **v1 is a single server** (one VM, Docker Compose), with no Terraform. CI/CD runs on **GitHub Actions** (§8).
+
+- **Solo mode** is in v1 (v0.10): one player against the aliens, survive 3 minutes, score = aliens killed.
 
 **Still open:**
 
-1. **License** for the public source. See [CI/CD §9](./CI-CD.md#9-open-questions). *(Git hosting is resolved: a public GitHub repository.)*
+1. **Solo scoring and pressure** (§4.9), to be settled by playtests: is "survive 3 minutes" the right goal, should the alien types score differently, and is a 30 s respawn enough pressure on Easy?
+2. The domain, the deploy window and the VM size. See [CI/CD §10](./CI-CD.md#10-open-questions). (The license is decided: Business Source License 1.1, see `LICENSE`.)

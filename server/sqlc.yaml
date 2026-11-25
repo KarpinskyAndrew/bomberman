@@ -1,0 +1,17 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema: internal/store/migrations      
+    queries: internal/store/queries        
+    gen:
+      go:
+        package: db                        
+        out: internal/store/db             
+        sql_package: pgx/v5                
+        emit_pointers_for_null_types: true # nullable column → *time.Time instead of pgtype.Timestamptz
+        overrides:
+          - db_type: uuid
+            go_type: github.com/google/uuid.UUID   
+          - db_type: citext
+            go_type: string                        
+            

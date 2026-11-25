@@ -2,9 +2,17 @@
 
 | | |
 |---|---|
-| **Version** | 0.3 (draft) |
-| **Date** | 2026-11-01 |
+| **Version** | 0.5 (draft) |
+| **Date** | 2026-11-14 |
 | **Parent** | [SPECIFICATION.md](./SPECIFICATION.md) · Events: [EVENTS-AND-MESSAGING.md](./EVENTS-AND-MESSAGING.md) |
+
+**Changes in 0.5:** product counters for the analytics funnel (§9.1), and an optional analytics session id `asid` in the `auth` message (§5.3). See [Events §12](./EVENTS-AND-MESSAGING.md#12-product-analytics).
+
+**Changes in 0.4:**
+
+- **v1 runs on one Compute Engine VM** with Docker Compose.
+- The repository layout gains `protocol/api` (gRPC, buf), `internal/grpcapi` and `deploy/`, and loses `infra/` (§3.1). HTTP routing uses **Gin**. Migrations use **Goose**.
+- Telemetry is OpenTelemetry with a Prometheus exporter, plus Sentry (§3.1, §9).
 
 **Changes in 0.3:**
 
@@ -26,7 +34,7 @@ This document describes how the Go game server is built and how clients talk to 
 ## 1. Design Principles
 
 1. **The server is authoritative, and the client predicts.** The server owns the truth. The client simulates its own player immediately and corrects itself when the server disagrees.
-2. **Get packets close to players.** Run game servers in several regions, route each player to the nearest one, and use Google's Premium Tier backbone.
+2. **Get packets close to players.** v1 runs one server in Frankfurt, which is central to the EU player base. v2 runs game servers in several regions and routes each player to the nearest one. Both use Google's Premium Tier backbone.
 3. **Never block the tick.** No I/O, locks, database calls or allocations happen in the simulation hot path, and a slow client never slows down an arena.
 4. **Small, binary, unbuffered.** Hot-path messages are compact binary frames sent with Nagle disabled and without compression.
 5. **The transport can be swapped.** The protocol is defined above the transport: WebSocket in v1, with WebTransport datagrams added in v2.
@@ -68,32 +76,36 @@ Resulting perceived latency:
 
 ```
 /server                 Go module
-  cmd/api               REST API service (auth, profiles), stateless
+  cmd/api               API service: Gin HTTP (auth, health) + gRPC server, stateless
   cmd/gameserver        Game server: lobby, arenas, real-time transport
   cmd/gateway           (v2) Regional WS/WT gateway: routes to the right game pod
-  cmd/worker            Rating worker: consumes match.finished (Pub/Sub push), DLQ replay tool
-  cmd/bots              Headless bot clients for load and latency tests
+  cmd/worker            Rating worker: consumes match.finished (Pub/Sub pull), housekeeping, DLQ replay tool
+  cmd/migrate           Applies the embedded Goose migrations (one-shot container)
+  cmd/bots              Headless bot clients for load, latency and deploy smoke tests
   cmd/vectorgen         Generates shared rule test vectors from internal/game (§3.2)
   internal/auth         JWT, refresh tokens, guest tokens, join tickets
-  internal/api          REST handlers (chi)
-  internal/store        PostgreSQL (pgx), migrations (golang-migrate)
+  internal/api          Gin HTTP handlers (auth endpoints, health, ping)
+  internal/grpcapi      gRPC service implementations + interceptors (auth, logging, OTel)
+  internal/gen          buf-generated Go code for protocol/api and protocol/events (never edited by hand)
+  internal/store        PostgreSQL (pgx + sqlc), migrations (Goose)
   internal/events       Domain event types, CloudEvents envelope, publisher + spool, outbox relay, inbox
   internal/rating       Pure ELO calculation + rated-match eligibility rules
   internal/notify       Postgres LISTEN rating_updated → push to connected players
   internal/game         Deterministic simulation: map, movement, bombs, fire, items, rules
   internal/game/ai      Alien behaviors (wander, BFS hunt, danger map)
-  internal/game/match   Best-of-N logic: round points, tiebreaks, forfeits, match placement
+  internal/game/match   Match logic: ranked best-of-3 (round points, tiebreaks, forfeits), unrated single round, match placement
   internal/arena        Arena actor: tick loop, input buffers, broadcasting, lifecycle
   internal/lobby        Arena registry, quick play, invite codes, directory sync
   internal/proto        Binary codec + message types
   internal/transport/ws WebSocket transport (github.com/coder/websocket)
   internal/transport/wt (v2) WebTransport transport (quic-go/webtransport-go)
-  internal/telemetry    Metrics (OpenTelemetry → Cloud Monitoring), slog, pprof
+  internal/telemetry    OpenTelemetry setup (traces → collector, metrics → Prometheus exporter), Sentry, slog, pprof
 /web                    Vue app (see GUI-PLAN.md)
-/protocol               Protocol spec + golden binary test vectors (shared by Go & TS)
+/protocol               Protocol spec + golden binary test vectors (shared by Go & TS), buf workspace
   testdata/rules/       Generated rule vectors for the TS prediction subset
+  api/                  gRPC service definitions (bomberman/v1/*.proto), buf lint + breaking in CI
   events/               Domain event Protobuf schemas (Pub/Sub topic schemas, buf breaking in CI)
-/infra                  Terraform
+/deploy                 v1 production stack: compose.yaml, Caddy, Envoy, OTel Collector, Prometheus, Grafana, scripts
 /docs
 ```
 
@@ -119,7 +131,12 @@ The simulation is **pure and deterministic**: `State + []Command → State' + []
   9. Spawn aliens (portals).
   10. Advance sudden death.
   11. Check win conditions.
-- Entities live in **fixed-size arrays/slices** that are preallocated per match: grid `[21*21]Tile`, players `[4]Player`, aliens `[16]Alien`, bombs `[32]Bomb`, items `[64]Item`. Steady-state ticks therefore make **0 allocations**, which is enforced by `testing.AllocsPerRun` benchmarks.
+- Entities live in **fixed-size arrays/slices** that are preallocated per match: grid `[21*21]Tile` (sized for the largest arena; smaller arenas use the top-left `size × size` part and a `size` field, so the array never changes shape), players `[4]Player`, aliens `[16]Alien`, bombs `[32]Bomb`, items `[64]Item`. Steady-state ticks therefore make **0 allocations**, which is enforced by `testing.AllocsPerRun` benchmarks.
+- **Alien movement is a strategy** (`internal/game/ai`), because the behaviors are still open (SPEC §4.7.1):
+  - A behavior is one small interface: given a read-only view of the round, the alien and the round's PRNG, it returns the direction for the alien's next tile. It never changes the state itself.
+  - Each alien type is mapped to a behavior in the `Ruleset`, so swapping "random walk" for "pursue" or a smarter planner is a configuration change, and two behaviors can be compared in playtests.
+  - Every behavior follows the simulation rules: deterministic, integer math, randomness only from the round's PRNG, no allocations (scratch space such as the BFS queue is preallocated per round), and called in alien id order (step 3 above).
+  - Behaviors decide **movement only**. What an alien can do (kill on contact, take fire damage, pick up items or not) stays in the round rules.
 - **What the client re-implements (the prediction subset):**
   - `canEnter(tile)`, `stepMovement(player, cmd)` (start/continue/turn/stop, 9 ticks per tile) and `canPlaceBomb(player, tile)`.
   - That is roughly 300 lines of TypeScript in `web/src/game/sim/`.
@@ -132,7 +149,8 @@ The simulation is **pure and deterministic**: `State + []Command → State' + []
   - The golden vectors for the binary codec (§5.5) work the same way.
 - **Rounds vs. matches:**
   - `internal/game` simulates **one round** (a pure state machine).
-  - A small `internal/game/match` package holds the best-of-N logic: round points, round wins, tiebreaks, forfeits and match placement. It is pure and fully unit-tested.
+  - A small `internal/game/match` package holds the match logic: best-of-3 for ranked (round points, round wins, tiebreaks, forfeits), a single round for unrated, and match placement. It is pure and fully unit-tested.
+  - The arena actor also owns the waiting room's 15 s **ready countdown** (SPEC §5.2). It is counted in ticks like everything else, so pausing and restarting it is deterministic.
   - The arena actor drives the sequence ROUND → ROUND_END → … → MATCH_END.
 - **Replays:** seed + config + the ordered command log reproduce a round exactly. Logs can be uploaded to GCS for debugging (`match_rounds.input_log_uri`).
 
@@ -213,7 +231,7 @@ Each connection has 2 goroutines:
 | Heartbeat | App-level `PING`/`PONG` every 2 s. It measures RTT and clock offset (§6.5) and keeps load balancers from closing idle connections. |
 | GOMEMLIMIT | 80 % of the container memory |
 | GOGC | Default |
-| Profiling | **Cloud Profiler** in prod. CI benchmarks fail on regressions in ns/tick or allocs/tick. |
+| Profiling | `net/http/pprof` on an internal-only port (reached through the IAP SSH tunnel in prod). CI benchmarks fail on regressions in ns/tick or allocs/tick. |
 
 ### 3.5 Capacity estimate (per 2 vCPU instance)
 
@@ -230,7 +248,7 @@ There is no Colyseus-style framework in this design. Libraries handle the low-le
 | Concern | Provided by | We write | Rough size |
 |---|---|---|---|
 | WebSocket server (handshake, framing, ping, close) | `github.com/coder/websocket` | – | – |
-| HTTP routing, JWT | `chi`, `golang-jwt/jwt` | Auth handshake on the socket (`AUTH` within 5 s) | ~100 lines Go |
+| HTTP routing, JWT | `gin-gonic/gin`, `golang-jwt/jwt` | Auth handshake on the socket (`AUTH` within 5 s) | ~100 lines Go |
 | Connection reader/writer, coalescing outbox, rate limits | – | `internal/transport/ws` (§3.4) | ~400 lines Go |
 | Binary codec | `encoding/binary` | `internal/proto` + `web/src/net/codec.ts`, golden vectors | ~400 Go + ~400 TS |
 | Control messages | `encoding/json` | Message structs and dispatch | ~300 lines Go |
@@ -313,7 +331,7 @@ The client sends **one `CMD` per client tick (60 Hz)**. On WebSocket `count = 1`
 | Type | Name | Layout |
 |---|---|---|
 | `0x80` | `TICK` | `u32 tick`, `u32 ackSeq`, `u8 flags` (bit0 = has snapshot, bit1 = has events, bit2 = has private events), [`SNAPSHOT`], [`u32 firstEventSeq`, `u8 nEvents`, `EVENT`…], [`u16 firstPrivSeq`, `u8 nPriv`, `EVENT`…] |
-| `0x81` | `ROUND_START` | `u8 roundNo`, `u8 bestOf`, `u64 seed`, `u32 startTick`, `u8 config[16]`, `u8 grid[441]` (0 empty, 1 hard, 2 soft), `u8 nPlayers` + spawn slots. Sent at every round's COUNTDOWN, because each round has a new map. Tick and `eventSeq` keep counting across rounds. |
+| `0x81` | `ROUND_START` | `u8 roundNo`, `u8 bestOf`, `u64 seed`, `u32 startTick`, `u8 config[16]`, `u8 size` (15, 17 or 21), `u8 grid[size × size]` (0 empty, 1 hard, 2 soft; at most 441 bytes), `u8 nPlayers` + spawn slots. Sent at every round's COUNTDOWN, because each round has a new map. Tick and `eventSeq` keep counting across rounds. |
 | `0x82` | `FULL_STATE` | Sent on join or reconnect: grid + all bombs, fires, items, aliens, players + `tick` |
 | `0x83` | `PONG` | `u32 clientTimeMs` (echoed), `u32 serverTick`, `u16 serverHoldUs` |
 
@@ -359,8 +377,8 @@ u8 nAliens
 
 | Direction | Types |
 |---|---|
-| C→S | `auth`, `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready`, `arena.start`, `arena.kick`, `resync` |
-| S→C | `auth.ok`, `lobby.list`, `lobby.update`, `arena.state`, `arena.countdown` (`{roundNo, bestOf, score}`), **`round.end`** (`{roundNo, winnerSlot\|null, draw, reason: "last_standing"\|"timeout_hp"\|"simultaneous", survivorsHp, placements, points, score:[{slot, roundWins, roundPoints}], matchDecided}`), `match.end` (`{matchId, mode, bestOf, winnerSlot\|null, draw, placements, rounds, stats, ratingPending}`), **`rating.updated`** (`{matchId, before, after, delta, tier, rank?}`), `server.draining`, `error` (`{code, message}`) |
+| C→S | `auth` (optional `asid`: the client's in-memory analytics session id, copied into server-side analytics events, [Events §12.4](./EVENTS-AND-MESSAGING.md#124-layer-3-own-event-pipeline); never used for game logic), `lobby.subscribe`, `lobby.unsubscribe`, `arena.create` (incl. `ranked`), `arena.join` (`{arenaId}` / `{code}`), `arena.resume` (`{arenaId, lastEventSeq}`), `arena.leave`, `arena.ready` (`{ready: bool}`), `arena.kick`, `resync`. There is no `arena.start`: a match starts only through the all-ready countdown (SPEC §5.2). |
+| S→C | `auth.ok`, `lobby.list`, `lobby.update`, `arena.state`, **`arena.ready_countdown`** (`{endsAtTick\|null, paused: bool, reason?: "player_joined"\|"not_ready"\|"player_left"}`, sent whenever the 15 s waiting-room countdown starts, pauses, restarts or is cancelled), `arena.countdown` (`{roundNo, bestOf, score}`), **`round.end`** (`{roundNo, winnerSlot\|null, draw, reason: "last_standing"\|"timeout_hp"\|"simultaneous", survivorsHp, placements, points, score:[{slot, roundWins, roundPoints}], matchDecided}`), `match.end` (`{matchId, mode, bestOf, winnerSlot\|null, draw, placements, rounds, stats, ratingPending}`), **`rating.updated`** (`{matchId, before, after, delta, tier, rank?}`), `server.draining`, `error` (`{code, message}`, e.g. `ranked_requires_account` when a guest tries to join a Ranked arena) |
 
 ### 5.4 Bandwidth estimate (4 players, 8 aliens)
 
@@ -442,7 +460,7 @@ The client runs its own player at **60 Hz** with the same movement rules as the 
   - On a network drop the client reconnects with exponential backoff (100 ms, 200 ms, 400 ms… capped at 2 s), then sends `auth` followed by `arena.resume {arenaId, lastEventSeq}`.
   - If `lastEventSeq` is still inside the arena's 10 s replay buffer, the server sends only the **missing events** plus the current snapshot. Otherwise it sends `FULL_STATE`.
   - The player's 15 s grace period (spec §4.8) is cancelled.
-- **Cloud Run 60-min socket limit (v1):** the client treats a server-initiated close (code 1001/1012) the same way and resumes **without showing a "disconnected" screen** if the resume succeeds within 1 s.
+- **Server-initiated closes** (code 1001/1012, e.g. a game server restart during a v1 deploy, or a proxy recycling connections) are handled the same way: the client resumes **without showing a "disconnected" screen** if the resume succeeds within 1 s. Caddy's WebSocket proxy has no idle timeout for `/play`, and the 2 s heartbeat keeps the connection active anyway.
 - **Draining (v2):** on `SIGTERM` a game pod:
   1. Marks itself `draining` in the directory, so it receives no new arenas.
   2. Sends `server.draining` to players in WAITING arenas, whose clients automatically re-join via Quick Play elsewhere.
@@ -453,26 +471,30 @@ The client runs its own player at **60 Hz** with the same movement rules as the 
 
 ## 8. Deployment Topology & Scaling
 
-### 8.1 v1: single region, single game instance
+### 8.1 v1: one server
 
 | Component | Configuration |
 |---|---|
-| Game server | **Cloud Run** (gen2): `min=max=1` instance, **CPU always allocated** (no throttling between requests, which matters for tick timing), concurrency 1000, session affinity, request timeout 3600 s, startup CPU boost. |
-| API service | Separate Cloud Run service, autoscaled. |
-| Region | **`europe-west3` (Frankfurt)**. EU only, see spec §8.1. |
-| Data | Cloud SQL for PostgreSQL 17 in the same region. |
-| Messaging | Pub/Sub topic `match-events` (+ DLQ). The **rating worker** is a Cloud Run service behind a push subscription. |
+| Host | One **Compute Engine VM** (`e2-standard-4`) in **`europe-west3` (Frankfurt)**, running Docker Compose. Full stack and runbook: [CI-CD §6](./CI-CD.md#6-the-v1-server). |
+| Edge | **Caddy** terminates TLS on :443 and proxies `/play` to the game server over the internal Docker network. This is the only proxy hop, and it is on the same machine. |
+| Game server | One container. **No CPU limit** is set on it (CFS quotas cause tick jitter); the observability containers get limits instead, so they can't starve the tick loop. `stop_grace_period: 2m` for draining. |
+| API service | One container (Gin + gRPC), behind Caddy and Envoy. |
+| Data | PostgreSQL 17 container on the same VM. |
+| Messaging | Pub/Sub topic `match-events` (+ DLQ). The **rating worker** container uses a **pull** subscription, so it needs no public endpoint. |
 
 **Known v1 limitations:**
 
-- A deploy or instance restart may interrupt running matches. Deploys should happen in low-traffic windows.
-- The Cloud Run Google Front End adds a small proxy hop. This is accepted for v1.
+- A deploy that changes the game server image, or a VM restart, interrupts running matches. Such deploys happen in low-traffic windows (CI-CD §6.2).
+- The VM is a single point of failure. Recovery is a VM restart, or a new VM from the latest disk snapshot.
+- Database, game server and observability share one machine, so a heavy query or a Prometheus compaction could in theory cause tick jitter. `tick_jitter_us` (§9.1) shows whether that happens.
 
-### 8.2 v2: multi-region GKE Autopilot
+### 8.2 v2: multi-region GKE
+
+Every service is deployed with its own **Helm** chart, from the same images v1 uses.
 
 ```
                   Player
-                    │  (1) GET /api/regions → ping each region (§8.4)
+                    │  (1) ListRegions → ping each region (§8.4)
                     ▼
      ┌────────── nearest region ───────────┐
      │  Passthrough NLB (TCP 443 + UDP 443) │
@@ -482,7 +504,7 @@ The client runs its own player at **60 Hz** with the same movement rules as the 
      └──────────────────────────────────────┘
         │ arena directory / lobby pub-sub        │ match.finished (regional endpoint)
         ▼                                        ▼
-  Memorystore (Redis), primary region     Cloud Pub/Sub (global) ──push──► Rating worker (Cloud Run)
+  Memorystore (Redis), primary region     Cloud Pub/Sub (global) ──pull──► Rating worker (GKE)
                                                                               │
                                    game pods ◄── LISTEN rating_updated ── Cloud SQL PostgreSQL (primary region)
 ```
@@ -503,7 +525,7 @@ When a player chooses an arena, quick-plays or creates one, the API service or l
 
 ### 8.4 Region selection (ping-based)
 
-1. `GET /api/regions` returns `[{id, label, pingUrl, wsUrl, wtUrl}]`.
+1. `RegionService.ListRegions` (gRPC, spec §6.1) returns `[{id, label, pingUrl, wsUrl, wtUrl}]`. In v1 the list has one entry.
 2. The client sends 1 warm-up request (which absorbs the TLS handshake), then **5 `HEAD pingUrl` requests** per region in parallel, and takes the median.
 3. The lowest-RTT region is preselected for Quick Play and Create Arena. The user can override it in the dialog.
 4. Results are cached for 10 minutes and re-measured in the background.
@@ -531,6 +553,23 @@ When a player chooses an arena, quick-plays or creates one, the API service or l
 | `client_resync_total`, `event_replay_total` | counter | spike |
 
 Messaging metrics (Pub/Sub latency, spool, DLQ, rating lag) are listed in [Events §10](./EVENTS-AND-MESSAGING.md#10-observability).
+
+**Product counters** (analytics layer 2, [Events §12.3](./EVENTS-AND-MESSAGING.md#123-layer-2-server-counters), sprint 14). They feed the Grafana "Funnel" dashboard and have no alerts. Labels are low-cardinality only: never a user, session, arena or match id.
+
+| Metric | Type | Labels |
+|---|---|---|
+| `sessions_started_total` | counter | `kind` (`guest` / `registered`), `input` (`keyboard` / `touch`) |
+| `arena_joins_total` | counter | `mode`, `via` (`list` / `code` / `quick_play` / `link` / `solo`) |
+| `waiting_room_leaves_total` | counter | `mode`, `reason` (`left` / `disconnected` / `kicked`) |
+| `waiting_room_wait_seconds` | histogram | `mode`, `outcome` (`started` / `left`) |
+| `matches_started_total`, `matches_finished_total` | counter | `mode` (+ `forfeit` on finished) |
+| `solo_runs_total` | counter | `difficulty`, `result` (`survived` / `eliminated`) |
+| `play_again_total` | counter | `mode` |
+| `analytics_dropped_total` | counter | `source` (events dropped by the layer 3 publisher, Events §12.4) |
+
+- Metrics are recorded with the **OpenTelemetry** metrics API and exposed on `/metrics` by the Prometheus exporter. Prometheus scrapes them, and Grafana holds the dashboards and the alert rules in the table above ([CI-CD §7](./CI-CD.md#7-rollback-notifications-observability)).
+- Hot-path instruments (tick duration, jitter) are created once at startup, with pre-built attribute sets, and are recorded outside `sim.Step`. A benchmark of the full arena tick checks that recording them doesn't allocate.
+- Panics and unexpected errors are reported to **Sentry**, tagged with `arenaId` and the release SHA.
 
 ### 9.2 Tools
 
